@@ -201,7 +201,7 @@ def _tap_csv(url, query, timeout=45, extra=None):
     return list(csv.DictReader(io.StringIO(r.text)))
 
 
-OTYPES = {"*": "star", "PM*": "star with large motion across the sky", "BD*": "brown dwarf", "LM*": "low-mass star",
+OTYPES = {"*": "star", "Bla": "blazar (active galaxy)", "BLL": "blazar (active galaxy)", "Rad": "radio source", "X": "X-ray source", "GiC": "galaxy in a cluster", "EmG": "galaxy with emission lines", "RR*": "pulsating star (RR Lyrae type)", "EB*": "eclipsing double star", "PM*": "star with large motion across the sky", "BD*": "brown dwarf", "LM*": "low-mass star",
           "TT*": "young star (T Tauri type)", "Or*": "young variable star", "Mi*": "pulsating red giant (Mira type)",
           "LP*": "long-period variable star", "V*": "variable star", "G": "galaxy", "SBG": "starburst galaxy",
           "IG": "interacting galaxy", "DNe": "dark cloud", "MoC": "molecular cloud", "**": "double star",
@@ -254,7 +254,7 @@ def _gaia_now(s, jyear):
     return (s["ra"] + dt * s["pmra"] / 3.6e6 / np.cos(np.radians(s["dec"])), s["dec"] + dt * s["pmdec"] / 3.6e6)
 
 
-def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None) -> dict:
+def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None, cats="gaia") -> dict:
     """Run every automatic check for the object at (ra, dec). Each part can fail on its own
     (a catalogue may be unreachable); the result then says so instead of guessing."""
     res = json.loads(flipbook.saved_path(round(ra0, 4), round(dec0, 4), field_deg).read_text())
@@ -262,7 +262,9 @@ def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None) -> dict:
     jyear = Time(mid, format="mjd").jyear
     cosd = np.cos(np.radians(dec))
     sep = lambda a, b: float(np.hypot(((a - ra + 180) % 360 - 180) * cosd, b - dec) * 3600)  # noqa: E731
-    out = dict(ra=ra, dec=dec, epoch=round(jyear, 2))
+    from . import catalogs
+    keys = catalogs.parse_keys(cats)
+    out = dict(ra=ra, dec=dec, epoch=round(jyear, 2), checked=[catalogs.BY_KEY[k]["short"] for k in keys])
 
     # ---- motion: from the automatic mover search if this object is one of its finds,
     #      otherwise from where the spectrum measurement found it in each pass
@@ -271,7 +273,8 @@ def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None) -> dict:
         e0, n0 = ((ra - ra0 + 180) % 360 - 180) * 3600 * np.cos(np.radians(dec0)), (dec - dec0) * 3600
         if min(np.hypot(t[0] - e0, t[1] - n0) for t in m["track"]) < 10:
             motion = dict(east=m["rate_east"], north=m["rate_north"], rate=m["rate"], source="mover search",
-                          sigma=m["sigma"], status=m["status"])
+                          sigma=m["sigma"], status=m["status"], known_in=m.get("known_in", []),
+                          matches=m.get("matches", []))
     if motion is None and spec and len(spec.get("followed", {})) >= 2 and not spec.get("wing"):
         ks = sorted(spec["followed"], key=int)
         a, b = spec["followed"][ks[0]], spec["followed"][ks[-1]]
@@ -284,6 +287,8 @@ def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None) -> dict:
 
     # ---- Gaia: is there a catalogued star here?
     try:
+        if "gaia" not in keys:
+            raise LookupError("off")
         cache = flipbook.place_dir(round(ra0, 4), round(dec0, 4)) / f"gaia_{field_deg:.3f}.json"
         if not cache.exists():
             from . import analysis
@@ -307,8 +312,18 @@ def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None) -> dict:
                                distance_ly=round(dist) if dist else None)
         else:
             out["gaia"] = dict(found=False, nearest_arcsec=round(best[0], 1) if best else None)
+    except LookupError:
+        out["gaia"] = dict(off=True)
     except Exception as e:
         out["gaia"] = dict(error=str(e))
+
+    # ---- the other switched-on catalogues
+    try:
+        out["catalogs"] = catalogs.check_point(ra0, dec0, field_deg, ra, dec, jyear,
+                                               [k for k in keys if k != "simbad"], motion=motion)
+    except Exception as e:
+        out["catalogs"] = []
+        out["catalogs_error"] = str(e)
 
     # ---- SIMBAD: does it have a name? (fast movers are listed where they were in 2000)
     also = None

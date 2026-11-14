@@ -278,3 +278,19 @@ canvas#sky { transition: transform .25s ease; }
 ul.known { list-style: none; padding: 0; margin: 0 0 6px; }
 ul.known li { font-size: 13px; color: #c6d1ea; padding: 3px 0; }
 body.practising #knownbox { display: none; }
+
+/* ---------- catalogue chooser and the scan banner ---------- */
+.chip.cat { display: inline-flex; align-items: center; gap: 7px; }
+.chip.cat .catdot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--cat); background: transparent; }
+.chip.cat.on { border-color: var(--cat); background: color-mix(in srgb, var(--cat) 16%, transparent); }
+.chip.cat.on .catdot { background: var(--cat); }
+.scanbanner { display: flex; align-items: center; gap: 12px; border-radius: 12px; padding: 10px 14px; margin: 0 0 10px; font-size: 14px; line-height: 1.4; }
+.scanbanner > div { flex: 1; }
+.scanbanner button { flex: none; white-space: nowrap; }
+.scanbanner.busy { background: rgba(108,196,255,0.07); border: 1px dashed rgba(108,196,255,0.4); color: #cfe6ff; }
+.scanbanner.none { background: rgba(255,255,255,0.04); border: 1px solid var(--line2); color: #c6d1ea; }
+.scanbanner.known { background: rgba(79,209,139,0.09); border: 1px solid rgba(79,209,139,0.5); color: #cdf3dd; }
+.scanbanner.found { background: rgba(255,200,87,0.13); border: 2px solid rgba(255,200,87,0.85); color: #ffe9bd; box-shadow: 0 0 18px rgba(255,200,87,0.18); }
+.mini-spin { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid rgba(108,196,255,0.2); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+body.practising .scanbanner { display: none; }
+@media (max-width: 640px) { .scanbanner { flex-direction: column; align-items: stretch; } }

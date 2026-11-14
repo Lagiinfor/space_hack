@@ -230,7 +230,7 @@ function knownHtml(K) {
   const caught = K.asteroids.filter((a) => a.caught), faint = K.asteroids.length - caught.length;
   for (const a of caught) L.push(`<li>☄ <b>Known asteroid ${esc(a.name)}</b>${a.neo ? " (near-Earth)" : ""}: SPHEREx caught it in ${a.caught} of ${a.photos} photos. See the Asteroids panel.</li>`);
   if (faint) L.push(`<li>☄ ${faint} known asteroid${faint > 1 ? "s" : ""} crossed this patch, too faint for SPHEREx to see.</li>`);
-  if (K.n_gaia !== undefined) L.push(`<li class="muted">${K.n_gaia} ordinary stars here are in the Gaia catalogue (turn on "Gaia stars" to see them).</li>`);
+  if (K.n_gaia !== undefined) L.push(`<li class="muted">${K.n_gaia} ordinary stars here are in the Gaia catalogue (turn on "Catalogue marks" to see them).</li>`);
   for (const n of K.notes) L.push(`<li class="muted">${esc(n)}</li>`);
   return `<div class="ctl-label">Already known in this patch</div><ul class="known">${L.join("") || "<li class='muted'>Nothing notable is catalogued here.</li>"}</ul>` +
     `<div class="muted small-note">These are not discoveries: they are listed so you can tell known things from unexplained ones.</div>`;

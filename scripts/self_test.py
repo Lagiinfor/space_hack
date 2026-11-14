@@ -102,7 +102,7 @@ else:
 if have(133.7593, -7.2421):
     mv = analysis.movers(133.7593, -7.2421, 0.06)["movers"]
     w = [m for m in mv if m["status"].startswith("candidate") and 5 < m["rate"] < 11]
-    check("WISE 0855 found as a CANDIDATE mover (not in Gaia)", bool(w), ", ".join(f"{m['status'][:9]} {m['rate']:.1f}" for m in mv))
+    check("WISE 0855 found as an UNEXPLAINED mover when only Gaia is switched on", bool(w), ", ".join(f"{m['status'][:9]} {m['rate']:.1f}" for m in mv))
 else:
     print("skip  WISE 0855 not downloaded")
 
@@ -167,6 +167,42 @@ if have(85.467, -4.852) or True:
             check("computer's picks: quiet field (Barnard 68) gives no false alarms", len(pk) == 0, f"{len(pk)} picks")
     except Exception as e:
         print("skip  quiet-field check:", e)
+
+# ------------------------------------------------------------ catalogues of known objects
+from spx import catalogs  # noqa: E402
+
+# matching rules, no internet needed
+_src_pm = [dict(name="mover", ra=10.0, dec=0.0, epoch=2015.4, pme=-8.0, pmn=0.6)]
+_now = 10.0 + 10.6 * -8.0 / 3600, 0.0 + 10.6 * 0.6 / 3600
+v, _, _ = catalogs.match_moving(_src_pm, _now[0], _now[1], 2026.0, -7.8, 0.7)
+check("catalogues: a source with the same motion, moved to today's date, is recognised", v == "match", v)
+v, _, _ = catalogs.match_moving(_src_pm, _now[0], _now[1], 2026.0, 3.0, -3.0)
+check("catalogues: a source moving a different way is not accepted as the same object", v == "none", v)
+_old = [dict(name="old", ra=10.0, dec=0.0, epoch=1999.0, pme=None, pmn=None)]
+v, _, _ = catalogs.match_moving(_old, 10.0, 0.0, 2026.0, -8.0, 0.6)
+check("catalogues: an old catalogue without motions does not guess about a fast object", v == "too_old", v)
+v, _, _ = catalogs.match_moving(_old, 10.0 + 27 * 0.1 / 3600, 0.0, 2026.0, 0.1, 0.0)
+check("catalogues: a slow object is traced back to where an old catalogue saw it", v == "match", v)
+check("catalogues: Pan-STARRS is not asked about the far south, SkyMapper not about the north",
+      not catalogs.covers("panstarrs", -53.0) and not catalogs.covers("skymapper", 30.0) and catalogs.covers("catwise", -53.0))
+
+if have(133.7593, -7.2421):
+    try:
+        catalogs.sources(133.7593, -7.2421, 0.06, "catwise")
+        r = analysis.movers(133.7593, -7.2421, 0.06, "gaia,catwise")
+        w = [m for m in r["movers"] if 5 < m["rate"] < 11]
+        check("WISE 0855 is recognised as KNOWN once CatWISE is switched on",
+              bool(w) and w[0]["status"].startswith("known") and "CatWISE" in w[0]["known_in"], w[0]["status"] if w else "not found")
+        c = objcheck.checks(133.7593, -7.2421, 0.06, 133.7605, -7.2421, movers=r, cats="gaia,catwise")
+        cw = [x for x in c["catalogs"] if x["key"] == "catwise"]
+        check("clicking WISE 0855: the checks say it is known in CatWISE", bool(cw) and cw[0].get("found") is True,
+              str(cw[0]) if cw else "no CatWISE row")
+        p_ = catalogs.path(133.7593, -7.2421, 0.06, "catwise")
+        t0 = p_.stat().st_mtime
+        catalogs.sources(133.7593, -7.2421, 0.06, "catwise")
+        check("a saved catalogue is not downloaded again", p_.stat().st_mtime == t0)
+    except RuntimeError as e:
+        print("skip  CatWISE checks (archive not reachable just now):", e)
 
 print("\n" + ("ALL CHECKS PASSED" if not failures else f"{len(failures)} CHECK(S) FAILED: " + "; ".join(failures)))
 sys.exit(1 if failures else 0)

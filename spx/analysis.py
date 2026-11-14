@@ -406,12 +406,15 @@ def gaia(ra0: float, dec0: float, field_deg: float, gmax: float = 19.0) -> dict:
 
 
 # ---------------------------------------------------------------- movers
-def movers(ra0: float, dec0: float, field_deg: float) -> dict:
-    """Blind search for anything that moved between passes (engine's spx/movers.py),
-    run on the combined view and on the two longest-wavelength bands (where cold
-    brown dwarfs show up), then checked against Gaia."""
+def movers(ra0: float, dec0: float, field_deg: float, cats="gaia") -> dict:
+    """Blind search for anything that moved between passes (spx/movers.py), run on the
+    combined view and on the two longest-wavelength bands (where cold brown dwarfs show
+    up), then checked against the catalogues that are switched on (`cats`, see
+    spx/catalogs.py). 'known' and 'unexplained' always refer to those catalogues only."""
     import base64
+    from . import catalogs
     from . import movers as mv
+    keys = catalogs.parse_keys(cats)
 
     pos = load_position(ra0, dec0, field_deg)
     res = pos["result"]
@@ -429,18 +432,28 @@ def movers(ra0: float, dec0: float, field_deg: float) -> dict:
             if not any(np.hypot((m["ra"][0] - o["ra"][0]) * 3600 * np.cos(np.radians(dec0)),
                                 (m["dec"][0] - o["dec"][0]) * 3600) < 4 for o in found):
                 found.append(m)
-    try:
-        g = gaia(ra0, dec0, field_deg)
-        cache = flipbook.place_dir(round(ra0, 4), round(dec0, 4)) / f"gaia_{field_deg:.3f}.json"
-        stars = json.loads(cache.read_text())
-        gl = [dict(source_id=s["id"], gmag=s["g"], ra=s["ra"], dec=s["dec"], pmra=s["pmra"], pmdec=s["pmdec"],
-                   parallax=s["parallax"], epoch=2016.0) for s in stars]
-        mv.explain_with_gaia(found, gl, mjds)
-        gaia_ok = True
-    except Exception:
-        for m in found:
-            m["status"] = "unchecked (Gaia not reachable)"
-        gaia_ok = False
+    notes = []
+    gaia_ok = False
+    for m in found:
+        m["status"] = "candidate"
+    if "gaia" in keys:
+        try:
+            gaia(ra0, dec0, field_deg)
+            cache = flipbook.place_dir(round(ra0, 4), round(dec0, 4)) / f"gaia_{field_deg:.3f}.json"
+            stars = json.loads(cache.read_text())
+            gl = [dict(source_id=s["id"], gmag=s["g"], ra=s["ra"], dec=s["dec"], pmra=s["pmra"], pmdec=s["pmdec"],
+                       parallax=s["parallax"], epoch=2016.0) for s in stars]
+            mv.explain_with_gaia(found, gl, mjds)
+            gaia_ok = True
+        except Exception:
+            notes.append("Gaia could not be reached.")
+            keys = [k for k in keys if k != "gaia"]
+    notes += catalogs.explain_movers(found, mjds, ra0, dec0, field_deg, keys)
+    if not found:
+        checked = [catalogs.BY_KEY[k]["short"] for k in keys
+                   if k == "gaia" or not any(n.startswith(catalogs.BY_KEY[k]["short"]) for n in notes)]
+    else:
+        checked = found[0]["checked"]
     cosd = np.cos(np.radians(pos["dec"]))
     out = []
     for m in found:
@@ -449,8 +462,9 @@ def movers(ra0: float, dec0: float, field_deg: float) -> dict:
                         rate=float(np.hypot(m["rate_east"], m["rate_north"])),
                         rate_east=m["rate_east"], rate_north=m["rate_north"],
                         shift=m["shift_arcsec"], sigma=m["sigma"], snr=m["snr"],
-                        gaia=m.get("gaia")))
-    return dict(movers=out, gaia_checked=gaia_ok)
+                        gaia=m.get("gaia"), known_in=m.get("known_in", []), checked=m.get("checked", []),
+                        matches=m.get("matches", []), untraceable=m.get("untraceable", [])))
+    return dict(movers=out, gaia_checked=gaia_ok, checked=checked, notes=notes)
 
 
 # ---------------------------------------------------------------- known asteroids and comets
@@ -527,7 +541,7 @@ def other_frames(ra0: float, dec0: float, field_deg: float) -> dict:
 
 
 # ---------------------------------------------------------------- the computer's picks
-def picks(ra0: float, dec0: float, field_deg: float) -> dict:
+def picks(ra0: float, dec0: float, field_deg: float, cats="gaia") -> dict:
     """Small areas the computer finds interesting, for the person to judge:
     - movers: from the automatic mover search (with the Gaia verdict);
     - changed: sources whose brightness changed between the first and last good pass,
@@ -558,16 +572,21 @@ def picks(ra0: float, dec0: float, field_deg: float) -> dict:
 
     out = []
     try:
-        m = movers(ra0, dec0, field_deg)
+        m = movers(ra0, dec0, field_deg, cats)
     except Exception:
-        m = dict(movers=[])
+        m = dict(movers=[], checked=[], notes=["The mover search failed."])
+    checked_txt = ", ".join(m.get("checked", [])) or "no catalogue"
     for x in m["movers"]:
         cand = x["status"].startswith("candidate")
+        known_txt = " and ".join(x.get("known_in", [])) or "a catalogue"
         out.append(dict(kind="mover", east=x["track"][0][0], north=x["track"][0][1], track=x["track"],
                         rate=x["rate"], rate_east=x["rate_east"], rate_north=x["rate_north"], status=x["status"],
-                        title=("Unexplained mover" if cand else "Known mover"),
+                        known_in=x.get("known_in", []), matches=x.get("matches", []),
+                        title=("Unexplained mover" if cand else "Known mover" if x["status"].startswith("known") else "Doubtful mover"),
                         why=f"Moved steadily between passes, about {x['rate']:.1f}″ per year. " +
-                            ("Nothing in the Gaia catalogue explains it." if cand else "The Gaia catalogue predicts this motion."),
+                            (f"Unexplained by the catalogues checked ({checked_txt})." if cand
+                             else f"Known in {known_txt}: {x['status'].split(': ', 1)[-1]}." if x["status"].startswith("known")
+                             else x["status"].split(": ", 1)[-1] + "."),
                         score=100 + x["sigma"]))
     mover_spots = [t for x in m["movers"] for t in x["track"]]
     near_mover = lambda e, nn: any(np.hypot(e - t[0], nn - t[1]) < 12 for t in mover_spots)  # noqa: E731
@@ -647,12 +666,12 @@ def picks(ra0: float, dec0: float, field_deg: float) -> dict:
     out.sort(key=lambda o: -o["score"])
     for i, o in enumerate(out[:12]):
         o["n"] = i + 1
-    return dict(picks=out[:12], n_sources=len(srcs))
+    return dict(picks=out[:12], n_sources=len(srcs), checked=m.get("checked", []), notes=m.get("notes", []))
 
 
 
 # ---------------------------------------------------------------- what is already known here
-def known_objects(ra0: float, dec0: float, field_deg: float) -> dict:
+def known_objects(ra0: float, dec0: float, field_deg: float, cats="gaia") -> dict:
     """Known things in the patch, for the "computer's picks" panel: fast-moving stars from
     Gaia, named objects from SIMBAD, and known asteroids/comets that crossed the patch."""
     from . import objcheck
@@ -696,6 +715,24 @@ def known_objects(ra0: float, dec0: float, field_deg: float) -> dict:
         out["named"] = out["named"][:8]
     except Exception as e:
         out["notes"].append(f"SIMBAD lookup failed ({e}).")
+    # the other switched-on catalogues: how many sources, and which ones they say are moving
+    from . import catalogs
+    out["catalogs"] = []
+    for k in catalogs.parse_keys(cats):
+        if k in ("gaia", "simbad"):
+            continue
+        try:
+            v = catalogs.for_view(ra0, dec0, field_deg, k)
+            mvr = []          # one line per object: CatWISE can list a fast mover more than once
+            for s_ in sorted([s_ for s_ in v["sources"] if s_["moves"] and s_["pm"] >= 0.5], key=lambda s_: s_.get("mag") or 99):
+                if not any(np.hypot(s_["east"] - o_["east"], s_["north"] - o_["north"]) < 8 for o_ in mvr):
+                    mvr.append(s_)
+            out["catalogs"].append(dict(key=k, name=catalogs.BY_KEY[k]["short"], n=v["n"], note=v.get("note"),
+                                        movers=[dict(name=s_["name"], pm=s_["pm"], east=round(s_["east"]),
+                                                     north=round(s_["north"]), mag=s_.get("mag"), band=s_.get("band"))
+                                                for s_ in mvr[:5]]))
+        except Exception as e:
+            out["notes"].append(f"{catalogs.BY_KEY[k]['short']} could not be reached ({e}).")
     try:
         a = flipbook.place_dir(ra0, dec0) / f"asteroids_{field_deg:.3f}.json"
         if a.exists():

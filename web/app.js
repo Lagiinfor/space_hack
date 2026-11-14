@@ -43,7 +43,7 @@ const api = async (url, opts) => {
   }
   return r.json();
 };
-const posQuery = () => `ra0=${S.R.ra}&dec0=${S.R.dec}&field=${S.R.field_deg}`;
+let posQuery = () => `ra0=${S.R.ra}&dec0=${S.R.dec}&field=${S.R.field_deg}`;
 
 function unpack(b64) {
   const bin = atob(b64), buf = new Uint8Array(bin.length);
@@ -616,7 +616,7 @@ function drawOverlays(ctx, s) {
       ctx.lineTo(xe - h * Math.cos(ang - 0.45), ye - h * Math.sin(ang - 0.45));
       ctx.lineTo(xe - h * Math.cos(ang + 0.45), ye - h * Math.sin(ang + 0.45)); ctx.closePath(); ctx.fill();
       ctx.font = `bold ${Math.round(W / 42)}px system-ui`;
-      ctx.fillText(`${cand ? "CANDIDATE " : ""}${m.rate.toFixed(1)}″/yr`, x0 + s * 3.6, y0 + s * 5);
+      ctx.fillText(`${cand ? "UNEXPLAINED " : ""}${m.rate.toFixed(1)}″/yr`, x0 + s * 3.6, y0 + s * 5);
     }
   }
   if (S.click && S.spec && S.spec.followed) {

@@ -103,6 +103,16 @@ Parameters: `ra`, `dec` (degrees), `field` (degrees: 0.04, 0.06, 0.1, 0.15), `ba
 The app also offers links out to other public viewers (WiseView from Backyard Worlds, Legacy Survey, Aladin Lite,
 SIMBAD, the Minor Planet Center). Nothing is taken from them.
 
+Catalogues of known objects that the volunteer can switch on (each fetched only when asked for, then kept):
+
+| Catalogue | Fetched from | Reference |
+|---|---|---|
+| **CatWISE2020** (infrared, with motions) | NASA/IPAC IRSA; NOIRLab Astro Data Lab when IRSA is busy | Marocco et al. 2021, ApJS 253, 8 |
+| **2MASS** point sources | VizieR (CDS) mirror at the Harvard-Smithsonian CfA; IRSA as fallback | Skrutskie et al. 2006, AJ 131, 1163 |
+| **Pan-STARRS1** mean objects | MAST at the Space Telescope Science Institute | Chambers et al. 2016, arXiv:1612.05560 |
+| **SkyMapper DR2** | SkyMapper archive, Australian National University | Onken et al. 2019, PASA 36, e033 |
+| **SIMBAD** objects in the patch | SIMBAD (CDS), CfA mirror | Wenger et al. 2000 |
+
 ### Open-source software
 
 - Python 3.12 with **Astropy** (Astropy Collaboration 2022, ApJ 935, 167), **NumPy**, **SciPy**, **Matplotlib**,
@@ -216,7 +226,7 @@ by 60-day gaps (fine for SPHEREx's real schedule; an unusual observing pattern c
 | **Known asteroids + NASA risk info**; **follow a moving object** (re-centre every photo on a comet/asteroid using JPL Horizons, then stack). | ☄ panel; `scripts/follow_object.py` | `spx/asteroids.py` |
 | Zoom, inverted colours, tame bright stars, links to WiseView / Legacy Survey / SIMBAD / Aladin, keyboard shortcuts. | "More controls", spectrum panel | `web/tools.js` |
 
-Checks: `scripts/self_test.py` runs 23 checks in all (these include: brown-dwarf reading, partner star, ordinary star reading,
+Checks: `scripts/self_test.py` runs 31 checks in all (these include: brown-dwarf reading, partner star, ordinary star reading,
 picks flag a variable star as "changed" not "moved", quiet field gives no picks).
 
 "What is it?" matches the spectrum against the 24 published SPHEREx standard templates (M8 to Y1) and against
@@ -225,6 +235,13 @@ plain star curves; if no template fits clearly better, it falls back to simple r
 **The game and the boards** (`web/game.js`, `spx/board.py`): five rounds on patches with known answers, up to 1,000
 points a round, a daily challenge, ranks, an explorer count and a confirmed-discoveries board. Real searching is
 never marked right or wrong. Scores are kept on this computer only.
+
+**Catalogue chooser and scan banner** (`spx/catalogs.py`, `web/catalogs.js`): the volunteer picks which catalogues
+of known objects to use (Gaia, CatWISE, 2MASS, Pan-STARRS, SkyMapper, SIMBAD), each with its own colour. "Known" and
+"unexplained" always refer to the catalogues switched on, and the tool says which were checked. Catalogues with
+motions are moved to the date of the picture; old catalogues without motions are only trusted when the object's
+earlier position can be worked out to within 10″. A banner above the picture says plainly whether the computer's
+scan is still running, found something, or found no candidates.
 
 **Zoom on the picture** (`web/zoom.js`): mouse wheel or pinch, drag to move, double-click.
 

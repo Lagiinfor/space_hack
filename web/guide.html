@@ -41,7 +41,7 @@
     <a href="#diff">6. Difference views</a>
     <a href="#spectrum">7. Click for a spectrum</a>
     <a href="#movers">8. Automatic mover search</a>
-    <a href="#gaia">9. Gaia stars overlay</a>
+    <a href="#gaia">9. Catalogues of known objects</a>
     <a href="#lenses">10. Chemistry filters (molecule lenses)</a>
     <a href="#flags">11. Problem flags and the exposure list</a>
     <a href="#share">12. Sharing and saving</a>
@@ -172,20 +172,43 @@
     <li>It links each one to the same object in the other passes.</li>
     <li>Ordinary stars wobble a little from pass to pass because of measuring noise; that wobble tells the tool how precise this field is. Anything that moved <b>steadily</b> by many times that wobble is flagged.</li>
     <li>Each flagged object is checked against Gaia:
-      <span style="color:#56d4dd"><b>KNOWN</b></span> = Gaia predicts this motion;
-      <span style="color:#ff7b72"><b>CANDIDATE</b></span> = nothing in Gaia explains it, so it is worth a human look.</li>
+      <span style="color:#56d4dd"><b>KNOWN</b></span> = one of the catalogues you switched on lists an object moving this way;
+      <span style="color:#ff7b72"><b>UNEXPLAINED</b></span> = none of the catalogues checked explains it, so it is worth a human look.</li>
   </ol>
   <p>The arrow starts at the object's first position and points the way it moved. It is drawn 4 times longer than the
     real motion so that a few arcseconds are visible. The number is the speed in ″/yr.</p>
 
-  <h2 id="gaia">9. Gaia stars overlay</h2>
-  <p>The <b>◯ Gaia stars</b> button (or <kbd>g</kbd>) draws a circle where the Gaia catalogue predicts each star should be
-    <i>on the date of the pass you are looking at</i>, including its proper motion and the small yearly wobble caused by
-    Earth going around the Sun (parallax).</p>
+  <h2 id="gaia">9. Catalogues of known objects</h2>
+  <p>To tell a new thing from a known one, the tool compares what it sees with published catalogues. Under
+    <b>Catalogues of known objects</b> you choose which ones to use, as many as you like. Each has its own colour.
+    A catalogue is downloaded for a patch the first time you switch it on there, and kept on the computer after that.</p>
+  <table>
+    <tr><td><span style="color:#4fd765">●</span> <b>Gaia DR3</b></td><td>ESA's star catalogue: very precise positions and motions in visible light. Whole sky. Misses very cold or very red objects.</td></tr>
+    <tr><td><span style="color:#ff9f43">●</span> <b>CatWISE2020</b></td><td>NASA's WISE and NEOWISE, 2010 to 2018: infrared sources with motions. Whole sky. The best catalogue for cold brown dwarfs that Gaia cannot see.</td></tr>
+    <tr><td><span style="color:#ff6bd6">●</span> <b>2MASS</b></td><td>Near-infrared survey photographed 1997 to 2001: where things were about 27 years ago. Whole sky. No motions.</td></tr>
+    <tr><td><span style="color:#4cc9f0">●</span> <b>Pan-STARRS1</b></td><td>Visible and far-red light from Hawaii, much fainter than Gaia. Only north of declination -30°.</td></tr>
+    <tr><td><span style="color:#b8f04c">●</span> <b>SkyMapper DR2</b></td><td>Visible light from Australia, for the southern sky that Pan-STARRS cannot see. Only south of declination +2°.</td></tr>
+    <tr><td><span style="color:#c9a0ff">◇</span> <b>SIMBAD</b></td><td>Objects that astronomers have studied and named, with their type. Drawn as small diamonds with the name.</td></tr>
+  </table>
+  <ul>
+    <li><b>Known or unexplained always refers to the catalogues you switched on</b>, and the tool says which ones were
+      checked. "Unexplained by the catalogues checked (Gaia)" can become "Known in CatWISE" when you switch CatWISE on.
+      Try it on WISE 0855: with Gaia alone it is an unexplained mover; with CatWISE or SIMBAD on, the tool recognises it.</li>
+    <li><b>◯ Catalogue marks</b> (or <kbd>g</kbd>) shows or hides the marks. Gaia stars get a full ring. CatWISE, 2MASS,
+      Pan-STARRS and SkyMapper each draw their own quarter of a ring, so an object known in several catalogues gets a
+      ring of several colours. Click an object and the labels next to it say what each catalogue holds there.</li>
+    <li><b>Old catalogues and fast objects.</b> Gaia, CatWISE and SIMBAD give motions, so their sources are moved to the
+      date of the picture. 2MASS, Pan-STARRS and SkyMapper give none: their marks show where a source was when that
+      survey saw it. For a moving object the tool works out where it would have been then; if that is too uncertain
+      (a fast object and an old catalogue), it says the catalogue cannot tell either way instead of guessing.</li>
+    <li>Fainter catalogue sources than SPHEREx can see are not drawn, to keep the picture readable.</li>
+  </ul>
+  <p><b>Gaia marks in detail.</b> A Gaia ring is drawn where Gaia predicts the star <i>on the date of the pass you are
+    looking at</i>, including its proper motion and the small yearly wobble caused by Earth going around the Sun (parallax).</p>
   <ul>
     <li><span style="color:#3fb950">Green circles</span>: ordinary stars (brighter than Gaia magnitude 16.5).</li>
     <li><span style="color:#ffd33d">Yellow circles</span> with a dashed path and a speed label: fast movers (over 0.2″/yr).</li>
-    <li>When you blink, a fast star should stay inside its moving circle. If something moves and has no circle, Gaia does not know it.</li>
+    <li>When you blink, a fast star should stay inside its moving circle. If something moves and has no mark from any catalogue you switched on, those catalogues do not list it.</li>
     <li>The "This position" panel lists how many Gaia stars are in view and the fast ones.</li>
   </ul>
 
@@ -246,7 +269,7 @@
   <div class="box try"><ul>
     <li>Chemistry filters → <b>Methane</b>: it is <b>the one red dot</b> at the centre; every other star is white.</li>
     <li>Flip-book, band 4.42–5.00 µm: a faint dot at the centre. In <b>Difference</b> it is a blue/red pair moving <b>west (right)</b>, about 8″/yr.</li>
-    <li>The mover search flags it as a <b>CANDIDATE: no Gaia star predicts this motion</b>. It is too faint for Gaia, so the tool found it with no hint. This is exactly how a new object would be discovered.</li>
+    <li>With only Gaia switched on, the mover search flags it as <b>UNEXPLAINED by the catalogues checked (Gaia)</b>: Gaia sees visible light and this object is too cold for it, so the tool found it with no hint. Switch on CatWISE or SIMBAD and the tool recognises it as known. This is exactly how a new object would be discovered.</li>
     <li>It is passing a faint background star right now, so its spectrum shows both: the star's light at short wavelengths and the brown dwarf's bump at 4–5 µm.</li>
     <li>Note: the coordinates printed in the challenge text are from about 2014. By 2026 it has moved about 1.6′ west, so the tour uses its present position.</li>
   </ul></div>
@@ -267,8 +290,9 @@
 
   <h3>More to explore (extra showpieces, tested in SPHEREx data)</h3>
   <div class="box try"><ul>
-    <li><b>Luhman 16</b>, the nearest brown dwarfs (6.5 light-years): not in Gaia's catalogue, so the mover search flags
-      them as a <b>CANDIDATE at 2.8″/yr</b>, exactly their known speed. A rediscovery with no hint.</li>
+    <li><b>Luhman 16</b>, the nearest brown dwarfs (6.5 light-years): with only Gaia switched on, the mover search flags
+      them as <b>UNEXPLAINED at 2.8″/yr</b>, exactly their known speed. A rediscovery with no hint. Switch on SIMBAD and
+      the tool recognises them by name.</li>
     <li><b>Kapteyn's Star</b>, an ancient halo star racing past at 8.6″/yr: found as a <b>KNOWN</b> mover. Very bright,
       so its spectrum uses the outer glow.</li>
     <li><b>M82, the Cigar Galaxy</b>: in the <b>Methane</b> filter the starry disk is blue-white, while a <b>green</b>
@@ -336,6 +360,9 @@
   </ul>
 
   <h2 id="picks">The computer's picks</h2>
+  <p><b>The banner above the picture</b> always says where the computer's own scan stands: still scanning; found
+    something (for example "1 unexplained moving object"), with a <b>Show me where</b> button; or found no candidates
+    under these conditions. The places stay hidden until you press the button, so you can look for yourself first.</p>
   <ul>
     <li>When you explore a patch freely, the computer searches it in the background but <b>keeps quiet</b>, so you look
       with fresh eyes first. Press <b>💡 Show the computer's picks</b> (key <kbd>p</kbd>) to compare.</li>

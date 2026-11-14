@@ -6,13 +6,14 @@
 <title>SPHEREx Sky Flip-book</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=80">
+<link rel="stylesheet" href="style.css?v=90">
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
 <script src="vendor/plotly.min.js" defer></script>
-<script src="app.js?v=82" defer></script>
+<script src="app.js?v=92" defer></script>
 <script src="asteroids.js?v=60" defer></script>
 <script src="tools.js?v=80" defer></script>
-<script src="game.js?v=80" defer></script>
+<script src="game.js?v=90" defer></script>
+<script src="catalogs.js?v=92" defer></script>
 <script src="zoom.js?v=81" defer></script>
 <script type="module" src="picker.js?v=60"></script>
 </head>
@@ -111,6 +112,7 @@
         <div class="where-now" id="wherenow"></div>
       </div>
 
+      <div id="scanbanner" class="scanbanner hidden"></div>
       <div class="viewer">
         <canvas id="sky" width="720" height="720"></canvas>
         <div class="overlay-label" id="olabel"></div>
@@ -155,9 +157,13 @@
             <button id="moversBtn" class="chip" title="Show or hide what the computer found interesting in this patch (key: p)">💡 Computer's picks</button>
             <button id="otherBtn" class="chip" disabled title="Add older photos of this spot from other telescopes (NASA's WISE in 2010, Canada's NEOSSat where it looked) to the timeline. Different telescopes: for comparing positions over many years, not brightness.">🛰 Older photos (2010 →)</button>
             <button id="astBtn" class="chip on" title="Known asteroids and comets that passed through this patch">☄ Asteroids</button>
-            <button id="gaiaBtn" class="chip" title="Circles where ESA's Gaia catalogue predicts each star on this date">◯ Gaia stars</button>
+            <button id="gaiaBtn" class="chip" title="Show or hide the marks of the catalogues switched on below (key: g)">◯ Catalogue marks</button>
             <button id="cross" class="chip on">✛ Centre mark</button>
           </div>
+
+          <div class="ctl-label">Catalogues of known objects <span class="muted">(switch on as many as you like; each has its own colour)</span></div>
+          <div class="row wrap" id="catchips"></div>
+          <div id="catinfo" class="muted small-note" style="margin-top:6px"></div>
         </div>
 
         <!-- chemistry controls -->
@@ -258,7 +264,7 @@
         <div id="pickquick" class="hidden"></div>
         <div id="knownbox"></div>
         <p class="muted small-note">The computer tracks every dot across the sky passes and points out small areas it finds
-          interesting: things that <b>moved</b> (checked against ESA's Gaia catalogue: <b>known</b> = Gaia predicts it,
+          interesting: things that <b>moved</b> (checked against the catalogues you switched on: <b>known</b> = a catalogue lists it,
           <b>unexplained</b> = worth a closer look), things that <b>changed brightness</b>, and <b>unusually red</b>
           objects. They are hints, not verdicts: your eyes decide.</p>
       </div>

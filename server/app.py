@@ -178,9 +178,37 @@ def flags(ra0: float, dec0: float, field: float, pass_index: int, band: int):
 
 
 @app.get("/api/movers")
-def movers(ra0: float, dec0: float, field: float):
+def movers(ra0: float, dec0: float, field: float, cats: str = "gaia"):
     _ready(ra0, dec0, field)
-    return analysis.movers(ra0, dec0, field)
+    return analysis.movers(ra0, dec0, field, cats)
+
+
+@app.get("/api/catalogs")
+def catalog_list(ra0: float = None, dec0: float = None, field: float = None):
+    """The catalogues of known objects that can be switched on, with their colours, and
+    whether each is already saved for this patch."""
+    from spx import catalogs
+    out = []
+    for c in catalogs.CATALOGS:
+        d = dict(c)
+        if ra0 is not None:
+            d["saved"] = catalogs.is_saved(ra0, dec0, field, c["key"])
+            d["covered"] = catalogs.covers(c["key"], dec0)
+        out.append(d)
+    return out
+
+
+@app.get("/api/catalog")
+def catalog(ra0: float, dec0: float, field: float, cat: str):
+    """One catalogue's sources in the patch. Downloaded the first time, then kept."""
+    from spx import catalogs
+    _ready(ra0, dec0, field)
+    if cat not in catalogs.BY_KEY or cat == "gaia":
+        raise HTTPException(400, "Unknown catalogue.")
+    try:
+        return catalogs.for_view(ra0, dec0, field, cat)
+    except Exception as e:
+        raise HTTPException(502, f"Could not reach the {catalogs.BY_KEY[cat]['short']} catalogue: {e}")
 
 
 @app.get("/api/asteroids")
@@ -203,10 +231,10 @@ def photo(ra0: float, dec0: float, field: float, obs_id: str, detector: int):
 
 
 @app.get("/api/known")
-def known(ra0: float, dec0: float, field: float):
+def known(ra0: float, dec0: float, field: float, cats: str = "gaia"):
     """Known things in the patch (Gaia fast movers, named objects, known asteroids)."""
     _ready(ra0, dec0, field)
-    return analysis.known_objects(ra0, dec0, field)
+    return analysis.known_objects(ra0, dec0, field, cats)
 
 
 @app.get("/api/board")
@@ -230,23 +258,23 @@ async def post_explored(request: Request):
 
 
 @app.get("/api/picks")
-def picks(ra0: float, dec0: float, field: float):
+def picks(ra0: float, dec0: float, field: float, cats: str = "gaia"):
     """Small areas the computer finds interesting (movers, brightness changes, very red objects)."""
     _ready(ra0, dec0, field)
-    return analysis.picks(ra0, dec0, field)
+    return analysis.picks(ra0, dec0, field, cats)
 
 
 @app.get("/api/inspect")
-def inspect_object(ra0: float, dec0: float, field: float, ra: float, dec: float):
+def inspect_object(ra0: float, dec0: float, field: float, ra: float, dec: float, cats: str = "gaia"):
     """All automatic checks for one clicked object (see spx/objcheck.py)."""
     _ready(ra0, dec0, field)
     from spx import objcheck
     spec = analysis.spectrum(ra0, dec0, field, ra, dec)
     try:
-        mv = analysis.movers(ra0, dec0, field)
+        mv = analysis.movers(ra0, dec0, field, cats)
     except Exception:
         mv = None
-    out = objcheck.checks(ra0, dec0, field, ra, dec, spec=spec, movers=mv)
+    out = objcheck.checks(ra0, dec0, field, ra, dec, spec=spec, movers=mv, cats=cats)
     out["what"] = objcheck.what_is_it(spec)
     return out
 
