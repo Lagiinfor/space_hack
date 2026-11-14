@@ -554,7 +554,7 @@ function drawOverlays(ctx, s) {
     const passIdx = cf && !cf.other ? cf.pass_index : null;
     for (const st of S.gaia.stars) {
       const fast = st.pm > 200;
-      if (!fast && st.g > GAIA_GMAX) continue;   // fainter Gaia stars are mostly invisible to SPHEREx
+      const faint = !fast && st.g > GAIA_GMAX;   // fainter Gaia stars: smaller, dimmer circles so the view stays clear
       // track through all passes for fast movers
       if (fast) {
         ctx.strokeStyle = "#ffd33d99"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
@@ -564,9 +564,9 @@ function drawOverlays(ctx, s) {
       }
       const t = cf && cf.other ? gaiaAt(st, cf.mjd) : st.track[passIdx ?? Math.floor(st.track.length / 2)];
       const [x, y] = skyToCanvas(t[0], t[1]);
-      const r = Math.max(6, 16 - st.g * 0.6) * s / 6;
-      ctx.strokeStyle = fast ? "#ffd33d" : "#3fb950cc";
-      ctx.lineWidth = fast ? 2.2 : 1.4;
+      const r = (faint ? 4 : Math.max(6, 16 - st.g * 0.6)) * s / 6;
+      ctx.strokeStyle = fast ? "#ffd33d" : faint ? "#3fb95077" : "#3fb950cc";
+      ctx.lineWidth = fast ? 2.2 : faint ? 1 : 1.4;
       ctx.beginPath(); ctx.arc(x * s, y * s, r, 0, 2 * Math.PI); ctx.stroke();
       if (fast) {
         ctx.fillStyle = "#ffd33d"; ctx.font = `${Math.round(W / 50)}px system-ui`;
@@ -638,7 +638,7 @@ function drawLegend() {
     el.innerHTML = `<span style="color:#ff6b5b">■</span> brighter than ${S.view === "diff" ? "average" : "first pass"} &nbsp; <span style="color:#5b8cff">■</span> fainter`;
     el.classList.remove("hidden");
   } else if (S.showGaia && S.gaia) {
-    el.innerHTML = `<span style="color:#3fb950">○</span> Gaia star (predicted position) &nbsp; <span style="color:#ffd33d">○</span> fast mover, dashed = path`;
+    el.innerHTML = `<span style="color:#3fb950">○</span> Gaia star (predicted position; small faint circles = faint stars) &nbsp; <span style="color:#ffd33d">○</span> fast mover, dashed = path`;
     el.classList.remove("hidden");
   } else el.classList.add("hidden");
 }

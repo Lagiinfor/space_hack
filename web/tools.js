@@ -434,7 +434,7 @@ $("zoomout").onclick = () => setZoom(S.zoom - 1);
 $("invertBtn").onclick = () => { S.invert = !S.invert; $("invertBtn").classList.toggle("on", S.invert); draw(); };
 $("tameBtn").onclick = () => { S.tame = !S.tame; $("tameBtn").classList.toggle("on", S.tame); draw(); };
 $("practiceBtn").onclick = startPractice;
-$("sky").addEventListener("click", () => setTimeout(setZoomOrigin, 0));
+
 
 document.addEventListener("keydown", (e) => {
   if (!S.R || !document.body.classList.contains("on-explore")) return;
