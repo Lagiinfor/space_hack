@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flip-book Guide</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=4">
 <style>
   .guide { max-width: 860px; margin: 0 auto; padding: 8px 20px 60px; }
   .guide h2 { font-size: 20px; margin: 34px 0 8px; padding-top: 6px; border-top: 1px solid var(--line); }
@@ -41,7 +42,7 @@
     <a href="#spectrum">7. Click for a spectrum</a>
     <a href="#movers">8. Automatic mover search</a>
     <a href="#gaia">9. Gaia stars overlay</a>
-    <a href="#lenses">10. Molecule lenses</a>
+    <a href="#lenses">10. Chemistry filters (molecule lenses)</a>
     <a href="#flags">11. Problem flags and the exposure list</a>
     <a href="#share">12. Sharing and saving</a>
     <a href="#tour">13. The five test targets: what to try</a>
@@ -78,17 +79,26 @@
     <tr><td><b>Saturated</b></td><td>The star is so bright that the centre pixels "burn out", like an over-exposed photo. Their values are lost.</td></tr>
   </table>
 
-  <h2 id="start">3. Opening a patch of sky</h2>
+  <h2 id="start">3. Opening a patch of sky (step 1)</h2>
+  <p>The site walks you through three steps, shown at the top of the page once you have picked a patch:
+    <b>1 Pick a patch → 2 Watch it change → 3 What is it made of?</b> You can click any step to jump to it.</p>
   <ul>
-    <li><b>Guided tour</b> (top right): click one of the five NASA test targets. They are already saved on this computer, so they open in a few seconds. Each comes with a short story of what to look for.</li>
-    <li><b>Sky position box</b>: type a position and press <b>Show</b> (or Enter). Three ways work:
-      <ul>
-        <li>degrees: <code>269.4464 4.7686</code></li>
-        <li>hours/minutes/seconds and degrees: <code>17 57 47.1 +04 46 07</code></li>
-        <li>a name: <code>RW Aur</code>, <code>Vega</code>, <code>M42</code>. The tool looks the name up and moves the catalogue position (which is for the year 2000) forward to 2026 using the object's known motion. The line under the box says what it found.</li>
-      </ul></li>
-    <li><b>Field size</b> (2.4′, 3.6′, 6′, 9′): how much sky is shown. Bigger shows more, which helps for fast movers, but downloads more.</li>
-    <li>The first time you open a new spot, the tool downloads every SPHEREx photo of it from NASA's archive: usually 250–550 photos, 2 to 4 minutes, shown with a progress bar. After that, the spot is saved on this computer and opens instantly.</li>
+    <li><b>The 3D sky.</b> The site opens on the Earth floating inside the real night sky: about 5,000 real stars in their
+      true colours, with the constellation figures. The thin blue ring is SPHEREx's orbit. <b>Drag</b> to look around,
+      <b>scroll</b> (or pinch) to zoom. Move the mouse over the sky to read the position under it.</li>
+    <li><b>Click any point of the sky</b> to choose it. A card appears saying where it is (and which constellation it is
+      near). Press <b>Watch this patch →</b> and the camera flies into that spot.</li>
+    <li><b>Famous places</b>: the five NASA test targets glow gold on the sky and are listed in the left panel. Click one:
+      the view swings round to it and the card tells its story. They are saved on this computer, so they open in seconds.</li>
+    <li><b>Or type a name or coordinates</b> (under the list): a name like <code>RW Aur</code> or <code>Vega</code>, degrees
+      like <code>269.4464 4.7686</code>, or hours/degrees like <code>17 57 47.1 +04 46 07</code>. The tool finds it on the
+      sky first so you can see where it is. Names are looked up in a catalogue, and the position (for the year 2000) is
+      moved forward to 2026 using the object's known motion.</li>
+    <li><b>Patch size</b> (on the card: small 2.4′, medium 3.6′, large 6′, extra large 9′): how much sky is shown. Bigger
+      shows more, which helps for fast movers, but downloads more.</li>
+    <li>The first time you open a new spot, the tool downloads every SPHEREx photo of it from NASA's archive: usually
+      250–550 photos, 2 to 4 minutes, shown with a progress bar. After that, the spot is saved on this computer and opens instantly.</li>
+    <li>To pick another patch, click the logo or <b>1 Pick a patch</b> at the top.</li>
   </ul>
 
   <h2 id="picture">4. Reading the picture</h2>
@@ -110,11 +120,12 @@
       same wavelengths, and only <i>real</i> changes blink.</p>
   </div>
   <ul>
-    <li><b>Wavelength band</b> buttons: pick one of the 6 detectors, or <b>All bands</b> (all six averaged: the deepest picture). Cold objects like brown dwarfs show best in the longest bands (3.83–4.41 and 4.42–5.00 µm).</li>
+    <li><b>Show</b>: <b>Photos</b> (normal), <b>Changes only</b> (see section 6) or <b>Deepest view</b> (all passes added).</li>
+    <li><b>Infrared colour</b> buttons: pick one of the 6 detectors (each has a coloured dot, from bluish short wavelengths to red long ones), or <b>All colours</b> (all six averaged: the deepest picture). Cold objects like brown dwarfs show best in the longest bands (3.83–4.41 and 4.42–5.00 µm).</li>
     <li><b>Sky pass</b> buttons: jump to a pass. The coloured dot next to each pass is the colour used for it in the spectrum plot.</li>
-    <li><b>Play / Pause</b> (or the <kbd>space</kbd> bar) and <b>Prev / Next</b> (or the <kbd>←</kbd> <kbd>→</kbd> keys).</li>
+    <li>The <b>timeline</b> under the picture: the round <b>play</b> button (or the <kbd>space</kbd> bar), one button per sky pass with its date and number of photos, and <b>Prev / Next</b> (or the <kbd>←</kbd> <kbd>→</kbd> keys).</li>
     <li><b>Blink all passes</b> or <b>Blink first ↔ last</b>: the longest time gap shows motion most clearly.</li>
-    <li><b>Speed</b>: how fast the frames change.</li>
+    <li>Under <b>More controls</b>: <b>Speed</b> (how fast the frames change), brightness sliders, blink options, problem flags, and the share/save buttons.</li>
     <li><b>Brightness</b>: slide right to make faint things brighter (bright stars will burn out); slide left to see detail in bright stars.</li>
     <li><b>Faint stars</b>: slide right to lift the faint end without burning out the bright stars.</li>
     <li>If a pass has only a handful of photos in a band, it is too noisy to compare fairly. The tool skips it in the blink and says so in the label.</li>
@@ -150,8 +161,8 @@
     brightness, but passes can still be compared fairly.</p></div>
 
   <h2 id="movers">8. Automatic mover search</h2>
-  <p>Every time you open a spot, the tool searches it by itself (results in the <b>Automatic mover search</b> panel, and
-    arrows on the picture; the <b>Movers</b> button hides/shows the arrows):</p>
+  <p>Every time you open a spot, the tool searches it by itself (results in the <b>➜ Things that moved</b> panel, and
+    arrows on the picture; the <b>➜ Movers</b> button hides/shows the arrows):</p>
   <ol>
     <li>It finds every point of light in each pass and measures its position precisely.</li>
     <li>It links each one to the same object in the other passes.</li>
@@ -164,7 +175,7 @@
     real motion so that a few arcseconds are visible. The number is the speed in ″/yr.</p>
 
   <h2 id="gaia">9. Gaia stars overlay</h2>
-  <p>The <b>Gaia stars</b> button (or <kbd>g</kbd>) draws a circle where the Gaia catalogue predicts each star should be
+  <p>The <b>◯ Gaia stars</b> button (or <kbd>g</kbd>) draws a circle where the Gaia catalogue predicts each star should be
     <i>on the date of the pass you are looking at</i>, including its proper motion and the small yearly wobble caused by
     Earth going around the Sun (parallax).</p>
   <ul>
@@ -174,8 +185,8 @@
     <li>The "This position" panel lists how many Gaia stars are in view and the fast ones.</li>
   </ul>
 
-  <h2 id="lenses">10. Molecule lenses</h2>
-  <p>Open the <b>Molecule lenses</b> tab. Each lens builds a false-colour picture from three wavelength ranges shown as
+  <h2 id="lenses">10. Chemistry filters (molecule lenses)</h2>
+  <p>Open the <b>🧪 Chemistry filters</b> tab (or click <b>3 What is it made of?</b> at the top). Each lens builds a false-colour picture from three wavelength ranges shown as
     red, green and blue. The colours are balanced so that <b>ordinary stars look white</b>. Anything with a colour has an
     unusual spectrum. Faint, noisy pixels are kept grey so that colour only appears where there is real signal.</p>
   <table>
@@ -229,7 +240,7 @@
 
   <h3>WISE 0855: the coldest known brown dwarf</h3>
   <div class="box try"><ul>
-    <li>Molecule lenses → <b>Methane</b>: it is <b>the one red dot</b> at the centre; every other star is white.</li>
+    <li>Chemistry filters → <b>Methane</b>: it is <b>the one red dot</b> at the centre; every other star is white.</li>
     <li>Flip-book, band 4.42–5.00 µm: a faint dot at the centre. In <b>Difference</b> it is a blue/red pair moving <b>west (right)</b>, about 8″/yr.</li>
     <li>The mover search flags it as a <b>CANDIDATE: no Gaia star predicts this motion</b>. It is too faint for Gaia, so the tool found it with no hint. This is exactly how a new object would be discovered.</li>
     <li>It is passing a faint background star right now, so its spectrum shows both: the star's light at short wavelengths and the brown dwarf's bump at 4–5 µm.</li>

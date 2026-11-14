@@ -5,6 +5,15 @@
 const $ = (id) => document.getElementById(id);
 const GAIA_GMAX = 16.5;
 const MIN_EXPOSURES = 6;
+// a colour per detector for the band buttons: short (bluish) to long (red) infrared
+const BAND_COLORS = { 1: "#7aa2ff", 2: "#62c7ff", 3: "#5fe0c0", 4: "#c6e66a", 5: "#ffb35c", 6: "#ff6f61" };
+const LENS_ICONS = { color: "🌈", methane: "🟣", ice: "🧊", co2: "💨" };
+const LENS_SHORT = {
+  color: "Normal stars white; cool or dusty things orange-red.",
+  methane: "Brown dwarfs with methane in their air glow red.",
+  ice: "Stars seen through icy dust clouds turn magenta.",
+  co2: "Carbon dioxide and carbon monoxide show up as colour.",
+};
 const PASS_COLORS =["#58a6ff", "#f0883e", "#3fb950", "#bc8cff", "#ff7b72", "#d29922"];
 
 const S = {
@@ -20,8 +29,12 @@ const S = {
 };
 
 // ------------------------------------------------------------------ helpers
+const OFFLINE_MSG = "Can't reach the tool's engine. Is the black start.bat window still open? " +
+  "If you closed it, double-click start.bat again, then refresh this page.";
 const api = async (url, opts) => {
-  const r = await fetch(url, opts);
+  let r;
+  try { r = await fetch(url, opts); }
+  catch { throw new Error(OFFLINE_MSG); }
   if (!r.ok) {
     let msg = r.statusText;
     try { msg = (await r.json()).detail || msg; } catch {}
@@ -36,13 +49,40 @@ function unpack(b64) {
   for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
   return new Float32Array(buf.buffer);
 }
+function showScreen(name) {
+  document.body.classList.toggle("on-pick", name === "pick");
+  document.body.classList.toggle("on-explore", name === "explore");
+  if (name === "explore") window.dispatchEvent(new Event("resize"));
+}
+function setStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    $("step" + i).classList.toggle("active", i === n);
+    $("step" + i).classList.toggle("done", i < n);
+  }
+}
 function showProgress(stage, frac) {
-  $("progress").style.display = "block";
+  $("progress").style.display = "flex";
   $("stage").textContent = stage;
   $("barfill").style.width = Math.round(frac * 100) + "%";
 }
 function hideProgress() { $("progress").style.display = "none"; }
-function fail(msg) { hideProgress(); $("error").textContent = msg || "Something went wrong."; }
+function fail(msg) {
+  hideProgress();
+  msg = msg || "Something went wrong.";
+  $("error").textContent = msg;
+  if (document.body.classList.contains("on-explore")) {
+    $("viewerror").innerHTML = `<b>That didn't work.</b><br>${msg}<br><br>` +
+      `<button class="primary" onclick="location.reload()">Try again</button> ` +
+      `<button onclick="backToSky()">Pick another patch</button>`;
+    $("viewerror").classList.remove("hidden");
+  }
+}
+function backToSky() {
+  play(false);
+  showScreen("pick");
+  window.skyPicker && window.skyPicker.reset();
+  history.replaceState(null, "", location.pathname);
+}
 
 // sky geometry. Grid: north up, east left, centre between the two middle pixels.
 function canvasToSky(cx, cy) {         // cx, cy in data-pixel units (0..n)
@@ -67,12 +107,24 @@ async function go(q) {
   showProgress("Working out the position...", 0.01);
   try {
     const pos = await api("/api/resolve?q=" + encodeURIComponent(q));
-    $("resolved").textContent = `→ RA ${pos.ra.toFixed(4)}°, Dec ${pos.dec.toFixed(4)}°  (${pos.how})`;
-    await load(pos.ra, pos.dec, parseFloat($("field").value));
+    hideProgress();
+    $("resolved").textContent = `Found: ${pos.how}`;
+    S.tourKey = null;
+    if (window.skyPicker && document.body.classList.contains("on-pick")) {
+      window.skyPicker.select(pos.ra, pos.dec, { name: pos.name || q, kind: "You searched for", story: pos.how, search: true });
+    } else {
+      await load(pos.ra, pos.dec, parseFloat($("field").value));
+    }
   } catch (e) { fail(e.message); }
 }
 
 async function load(ra, dec, field, keepBand) {
+  showScreen("explore");
+  setStep(2);
+  $("viewerror").classList.add("hidden");
+  $("player").classList.add("hidden");
+  $("specpanel").classList.add("hidden");
+  $("wherenow").textContent = `RA ${(+ra).toFixed(4)}°, Dec ${(+dec).toFixed(4)}°`;
   showProgress("Starting...", 0.01);
   $("error").textContent = "";
   const { job } = await api(`/api/flipbook?ra=${ra}&dec=${dec}&field=${field}`, { method: "POST" });
@@ -107,7 +159,9 @@ function setup(keepBand) {
   for (const b of R.bands) {
     if (!R.frames.some((f) => f.band === b.band)) continue;
     const btn = document.createElement("button");
-    btn.textContent = b.band === 0 ? "All bands" : `${b.wl_min.toFixed(2)}–${b.wl_max.toFixed(2)} µm`;
+    btn.textContent = b.band === 0 ? "All colours" : `${b.wl_min.toFixed(1)}–${b.wl_max.toFixed(1)} µm`;
+    btn.className = "chip band-chip";
+    if (b.band) btn.style.setProperty("--band", BAND_COLORS[b.band]);
     btn.title = b.band === 0 ? "All six detectors averaged: deepest picture" : `Detector ${b.band}`;
     btn.dataset.band = b.band;
     btn.onclick = () => { S.band = b.band; S.flags = null; refresh(); loadFlags(); };
@@ -116,6 +170,11 @@ function setup(keepBand) {
   $("lenspass").innerHTML = `<option value="all">All passes added (deepest)</option>` +
     R.passes.map((p) => `<option value="${p.index}">${p.label} only</option>`).join("");
   $("scale").textContent = `${(R.field_deg * 60).toFixed(1)}′ across`;
+  const cname = window.skyPicker ? window.skyPicker.constellationOf(R.ra, R.dec) : "";
+  $("wherenow").textContent = `RA ${R.ra.toFixed(4)}°, Dec ${R.dec >= 0 ? "+" : ""}${R.dec.toFixed(4)}°` + (cname ? ` · in ${cname}` : "");
+  const tt = S.tourKey && S.tour.find((t) => t.key === S.tourKey);
+  $("tourpanel").classList.toggle("hidden", !tt);
+  if (tt) { $("tourkind").textContent = tt.kind; $("tourname").textContent = tt.name; $("tourstory").textContent = tt.story; }
   $("summary").textContent = (R.complete === false ? "Part of the archive did not answer, so some exposures may be missing; spectra and lenses need the full set, try this spot again later. " : "") +
     `RA ${R.ra.toFixed(4)}°, Dec ${R.dec.toFixed(4)}°. ${R.n_used} of ${R.n_images} SPHEREx exposures used, ` +
     `in ${R.passes.length} sky passes. Pixel size on screen: ${R.pix_arcsec}″ (SPHEREx pixels are 6.15″).`;
@@ -163,7 +222,8 @@ function refresh() {
   fs.forEach((f, i) => {
     const p = S.R.passes[f.pass_index];
     const btn = document.createElement("button");
-    btn.innerHTML = `<span style="color:${PASS_COLORS[p.index % 6]}">●</span> ${p.label}`;
+    btn.className = "pass-chip";
+    btn.innerHTML = `<span class="dot" style="background:${PASS_COLORS[p.index % 6]}"></span>${p.label}<small>${f.n} photos</small>`;
     btn.classList.toggle("on", i === S.frameIdx % fs.length);
     btn.onclick = () => { play(false); S.frameIdx = i; draw(); };
     $("passes").appendChild(btn);
@@ -171,7 +231,9 @@ function refresh() {
   $("cross").classList.toggle("on", S.cross);
   $("gaiaBtn").classList.toggle("on", S.showGaia);
   $("moversBtn").classList.toggle("on", S.showMovers);
-  $("play").textContent = S.playing ? "Pause" : "Play";
+  $("play").textContent = S.playing ? "❚❚" : "▶";
+  for (const b of $("viewseg").children) b.classList.toggle("on", b.dataset.view === S.view || (S.view === "first" && b.dataset.view === "diff"));
+  setStep(S.mode === "lens" || !$("specpanel").classList.contains("hidden") ? 3 : 2);
   $("tab-flip").classList.toggle("on", S.mode === "flip");
   $("tab-lens").classList.toggle("on", S.mode === "lens");
   $("flip-controls").classList.toggle("hidden", S.mode !== "flip");
@@ -424,7 +486,7 @@ function play(on) {
   };
   draw();
   if (on) S.timer = setTimeout(tick, +$("speed").value);
-  $("play").textContent = S.playing ? "Pause" : "Play";
+  $("play").textContent = S.playing ? "❚❚" : "▶";
 }
 
 // ------------------------------------------------------------------ modes, lenses, overlays
@@ -439,7 +501,9 @@ async function loadLenses() {
   $("lenslist").innerHTML = "";
   for (const L of S.lenses) {
     const b = document.createElement("button");
-    b.textContent = L.name; b.dataset.key = L.key;
+    b.className = "lens-card";
+    b.innerHTML = `<span class="lens-icon">${LENS_ICONS[L.key] || "🔬"}</span><b>${L.name}</b><small>${LENS_SHORT[L.key] || ""}</small>`;
+    b.dataset.key = L.key;
     b.onclick = () => { S.lensKey = L.key; S.lensData = null; refresh(); };
     $("lenslist").appendChild(b);
   }
@@ -539,6 +603,7 @@ async function clickSpectrum(e) {
   S.click = sky;
   draw();
   $("specpanel").classList.remove("hidden");
+  setStep(3);
   $("specinfo").textContent = `Measuring at RA ${sky.ra.toFixed(5)}°, Dec ${sky.dec.toFixed(5)}° in every exposure...`;
   $("specwarn").classList.add("hidden");
   try {
@@ -579,7 +644,9 @@ function plotSpectrum() {
     font: { color: css.getPropertyValue("--text"), size: 12 },
     margin: { l: 56, r: 10, t: 46, b: 44 },
     xaxis: { title: "Wavelength (µm)", gridcolor: "#30363d", range: [0.7, 5.05], zeroline: false },
-    yaxis: { title: sp.wing ? "Outer-glow brightness (mJy)" : "Brightness (mJy)", gridcolor: "#30363d", type: S.logy ? "log" : "linear", zeroline: false },
+    yaxis: { title: sp.wing ? "Outer-glow brightness (mJy)" : "Brightness (mJy)", gridcolor: "#30363d", type: S.logy ? "log" : "linear", zeroline: false,
+      // ignore a few wild single-photo points when choosing the scale (they stay on the plot; zoom out to see them)
+      ...(S.logy ? {} : { range: robustRange(sp.points.map((q) => q.flux)) }) },
     legend: { orientation: "h", y: 0.99, yanchor: "top", x: 0, yref: "container" },
     shapes: [
       // molecule bands, as faint shading
@@ -602,6 +669,14 @@ function plotSpectrum() {
     $("specwarn").textContent = "No clean measurements here (too close to the edge or to flagged pixels).";
     $("specwarn").classList.remove("hidden");
   }
+}
+
+function robustRange(v) {
+  const a = v.filter(Number.isFinite).sort((x, y) => x - y);
+  if (!a.length) return undefined;
+  const lo = a[Math.floor(a.length * 0.01)], hi = a[Math.floor(a.length * 0.985)];
+  const pad = (hi - lo) * 0.15 || 1;
+  return [Math.min(0, lo - pad), hi + pad];
 }
 
 function moveText(fol) {
@@ -665,20 +740,10 @@ async function saveGif() {
 // ------------------------------------------------------------------ tour
 async function loadTour() {
   try { S.tour = await api("/api/tour"); } catch { S.tour = []; }
-  $("tour").innerHTML = "";
-  for (const t of S.tour) {
-    const b = document.createElement("button");
-    b.innerHTML = `<b>${t.name}</b><span>${t.kind}${t.ready ? "" : " · first visit downloads"}</span>`;
-    b.dataset.key = t.key;
-    b.onclick = () => startTour(t);
-    $("tour").appendChild(b);
-  }
+  window.dispatchEvent(new CustomEvent("tour-loaded", { detail: S.tour }));
 }
 async function startTour(t) {
   S.tourKey = t.key;
-  for (const b of $("tour").children) b.classList.toggle("on", b.dataset.key === t.key);
-  $("tourstory").textContent = t.story;
-  $("tourstory").classList.remove("hidden");
   S.band = t.band; S.mode = "flip"; S.view = "normal"; $("view").value = "normal";
   $("field").value = String(t.field);
   history.replaceState(null, "", "?");
@@ -693,7 +758,16 @@ async function startTour(t) {
 
 // ------------------------------------------------------------------ wiring
 function wire() {
-  $("go").onclick = () => { S.tourKey = null; $("tourstory").classList.add("hidden"); go(); };
+  $("go").onclick = () => { S.tourKey = null; go(); };
+  $("backtosky").onclick = backToSky;
+  $("step1").onclick = backToSky;
+  $("step2").onclick = () => { if (S.R) setMode("flip"); };
+  $("step3").onclick = () => {
+    if (!S.R) return;
+    setMode("lens");
+    $("hover").textContent = "Tip: click any star or dot to see its spectrum (what it is made of).";
+  };
+  for (const b of $("viewseg").children) b.onclick = () => { $("view").value = b.dataset.view; $("view").onchange(); };
   $("where").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
   $("play").onclick = () => play(!S.playing);
   $("prev").onclick = () => { play(false); step(-1); loadFlags(); };
@@ -709,7 +783,7 @@ function wire() {
   $("flagsel").onchange = () => { S.flagLayer = $("flagsel").value; if (S.flagLayer) play(false); loadFlags(); };
   for (const id of ["bright", "soft"]) $(id).addEventListener("input", draw);
   $("sky").addEventListener("click", clickSpectrum);
-  $("specclose").onclick = () => { $("specpanel").classList.add("hidden"); S.click = null; draw(); };
+  $("specclose").onclick = () => { $("specpanel").classList.add("hidden"); S.click = null; refresh(); };
   $("logy").onclick = () => { S.logy = !S.logy; $("logy").classList.toggle("on", S.logy); plotSpectrum(); };
   $("share").onclick = async () => {
     try { await navigator.clipboard.writeText(location.href); $("sharemsg").textContent = "Link copied."; }
@@ -754,7 +828,8 @@ async function init() {
   const groups = ["Saturated / bloom", "Cosmic ray / transient", "Ghost / stray light", "Satellite streak",
     "Bad / hot / dead pixel", "Persistence (afterimage)"];
   $("flagsel").innerHTML += groups.map((g) => `<option value="${g}">Flags: ${g}</option>`).join("");
-  await Promise.all([loadLenses(), loadTour()]);
+  try { await Promise.all([loadLenses(), loadTour()]); }
+  catch (e) { $("error").textContent = OFFLINE_MSG; }
   // open straight onto a shared link: ?ra=..&dec=..&field=..&band=..&mode=..&lens=..&gaia=1&view=..
   const p = new URLSearchParams(location.search);
   if (p.get("view")) { S.view = p.get("view"); $("view").value = S.view; }
