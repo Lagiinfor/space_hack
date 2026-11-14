@@ -648,3 +648,62 @@ def picks(ra0: float, dec0: float, field_deg: float) -> dict:
     for i, o in enumerate(out[:12]):
         o["n"] = i + 1
     return dict(picks=out[:12], n_sources=len(srcs))
+
+
+
+# ---------------------------------------------------------------- what is already known here
+def known_objects(ra0: float, dec0: float, field_deg: float) -> dict:
+    """Known things in the patch, for the "computer's picks" panel: fast-moving stars from
+    Gaia, named objects from SIMBAD, and known asteroids/comets that crossed the patch."""
+    from . import objcheck
+    ra0, dec0 = round(ra0, 4), round(dec0, 4)
+    res = json.loads(flipbook.saved_path(ra0, dec0, field_deg).read_text())
+    cosd = np.cos(np.radians(dec0))
+    half = field_deg * 1800
+    out = dict(fast_stars=[], named=[], asteroids=[], notes=[])
+    try:
+        g = gaia(ra0, dec0, field_deg)
+        for s_ in g["stars"]:
+            if s_["pm"] >= 100:
+                t = s_["track"][len(s_["track"]) // 2]
+                out["fast_stars"].append(dict(g=s_["g"], pm=round(s_["pm"] / 1000, 2), east=t[0], north=t[1]))
+        out["n_gaia"] = g["n"]
+    except Exception as e:
+        out["notes"].append(f"Gaia could not be reached ({e}).")
+    try:
+        q = ("SELECT TOP 40 main_id, otype, sp_type, ra, dec FROM basic WHERE "
+             f"CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS',{ra0},{dec0},{field_deg * 0.72}))=1 AND otype <> 'Pl'")
+        rows = None
+        for url in objcheck.SIMBAD_TAPS:
+            try:
+                rows = objcheck._tap_csv(url, q, extra={"request": "doQuery", "lang": "adql", "format": "csv", "query": q})
+                break
+            except Exception:
+                continue
+        if rows is None:
+            out["notes"].append("The SIMBAD name database could not be reached.")
+        for r in rows or []:
+            e = ((float(r["ra"]) - ra0 + 180) % 360 - 180) * 3600 * cosd; n = (float(r["dec"]) - dec0) * 3600
+            if max(abs(e), abs(n)) > half:
+                continue
+            code = r["otype"].strip('"')
+            out["named"].append(dict(name=r["main_id"].strip('"'), type=objcheck.OTYPES.get(code, code),
+                                     plain=code in ("*", "IR", "NIR"), east=round(e), north=round(n),
+                                     d=float(np.hypot(e, n))))
+        # the interesting kinds first, then nearest the centre
+        out["named"].sort(key=lambda o: (o["plain"], o["d"]))
+        out["n_named"] = len(out["named"])
+        out["named"] = out["named"][:8]
+    except Exception as e:
+        out["notes"].append(f"SIMBAD lookup failed ({e}).")
+    try:
+        a = flipbook.place_dir(ra0, dec0) / f"asteroids_{field_deg:.3f}.json"
+        if a.exists():
+            for o in json.loads(a.read_text()).get("objects", []):
+                out["asteroids"].append(dict(name=o["name"], caught=o["n_caught"], photos=o["n_photos"], vmag=o.get("vmag"),
+                                             neo=bool((o.get("risk") or {}).get("neo"))))
+        else:
+            out["notes"].append("The asteroid check for this patch is still running.")
+    except Exception:
+        pass
+    return out

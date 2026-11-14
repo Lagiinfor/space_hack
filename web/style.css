@@ -267,3 +267,14 @@ body.practising #info, body.practising #astpanel, body.practising #moverpanel, b
 body.practising #specpanel, body.practising .where-now, body.practising #moversBtn, body.practising #gaiaBtn,
 body.practising #astBtn, body.practising #otherBtn, body.practising #tab-lens, body.practising .stepper { display: none !important; }
 canvas#sky { transition: transform .25s ease; }
+
+/* ---------- game and boards ---------- */
+.gamebtns .practice-start { width: auto; flex: 1 1 120px; margin-top: 0; }
+.share { font-family: ui-monospace, Consolas, monospace; background: rgba(0,0,0,0.35); border: 1px solid var(--line2); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; font-size: 14px; }
+.boardbox { position: fixed; inset: 0; z-index: 60; background: rgba(3,5,10,0.8); backdrop-filter: blur(6px); overflow: auto; padding: 30px 14px; }
+.board { max-width: 760px; margin: 0 auto; background: var(--panel-solid); border: 1px solid var(--line2); border-radius: 18px; padding: 20px; }
+.board h2 { font-family: var(--display); margin: 0; }
+.board h3 { font-size: 15px; margin: 18px 0 6px; color: #cdd9e5; }
+ul.known { list-style: none; padding: 0; margin: 0 0 6px; }
+ul.known li { font-size: 13px; color: #c6d1ea; padding: 3px 0; }
+body.practising #knownbox { display: none; }

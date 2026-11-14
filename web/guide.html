@@ -320,7 +320,9 @@
   <ul>
     <li><b>Click any object.</b> The panel on the right shows its spectrum and, above it, a plain-language reading of
       <b>what it looks like</b> (ordinary star, cool red star, cold brown dwarf, dusty object), with how sure the tool is
-      and why. It is a rule-of-thumb reading of the spectrum's shape, not a full classification.</li>
+      and why. For brown dwarfs it finds the best match among the 24 published SPHEREx templates, types M8 to Y1, built
+      from 6,003 SPHEREx spectra (Gagné et al. 2026); if no template fits clearly better than a plain star, it falls
+      back to simple rules about the spectrum's shape.</li>
     <li><b>Automatic checks</b> run by themselves: is it in ESA's Gaia star catalogue? does it have a name in the SIMBAD
       database (fast movers are looked up where they were in the year 2000)? did a known asteroid pass over the spot?
       does it move, and does the motion match Gaia? <b>Does it have a partner</b>, another star within half a degree
@@ -344,10 +346,28 @@
     <li>On the guided tour the picks are shown from the start, because those stops are demonstrations.</li>
   </ul>
 
-  <h2 id="practice">Practice mode</h2>
-  <p>On the first screen, <b>🎯 Practice</b> gives five quick rounds on patches where the answer is known. Watch the
-    flip-book, click what moves (or press "Nothing moves here"), and get instant feedback. Some patches have no mover:
-    knowing when nothing is there matters just as much.</p>
+  <h2 id="practice">The game: Spot the mover</h2>
+  <ul>
+    <li>On the first screen, <b>🎯 Spot the mover</b> starts five rounds on patches where the answer is known. Click where
+      something <b>moved or changed brightness</b>, or press "Nothing real changed here" (some rounds are trick rounds).</li>
+    <li><b>Points:</b> up to 1,000 a round: up to 700 for how close you click, up to 300 for speed. 5,000 for a perfect game.
+      After each answer the picture shows where the object really was and how far off you were.</li>
+    <li><b>📅 Daily challenge:</b> the same five patches for everyone that day; only your first try counts. "Copy result"
+      gives a short line of coloured squares to share.</li>
+    <li><b>🏆 Boards:</b> game totals with ranks (Stargazer → Sky Scout → Mover Hunter → Night Watch → Discoverer), today's
+      daily challenge, <b>explorers</b> (how many real patches each person has looked at) and <b>confirmed discoveries</b>.</li>
+    <li><b>What is scored and what is not.</b> Game points come only from rounds with a known answer. Real searching is
+      never marked right or wrong, because nobody knows the answer yet; it is counted as patches explored. Discovery
+      points are given only when astronomers confirm a report (rarer finds score more: 40 for a variable star, 50 for an
+      asteroid, 60 for a nearby red dwarf, up to 1,000 for a very cold brown dwarf and 5,000 for an interstellar
+      visitor). Nothing has been confirmed yet, so that board is honestly empty.</li>
+    <li>The boards live on this computer for now; they are built so they can become shared when the site goes online.</li>
+  </ul>
+
+  <h2 id="known">Known objects in a patch</h2>
+  <p>When you show the computer's picks, a second list, <b>Already known in this patch</b>, names what the catalogues
+    already hold: known fast-moving stars (Gaia), named objects (SIMBAD) and known asteroids or comets that crossed the
+    patch. It is kept separate from the unexplained picks, so you can tell known things from possible new ones.</p>
 
   <h2 id="older">Older photos from other telescopes</h2>
   <ul>

@@ -32,3 +32,5 @@ data/*/neossat/
 reports/
 !data/ra245.7594_dec-16.6614/
 data/follow_*/
+# scores and explorer counts kept on this computer
+profile/

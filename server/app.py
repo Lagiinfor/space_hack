@@ -202,6 +202,33 @@ def photo(ra0: float, dec0: float, field: float, obs_id: str, detector: int):
         raise HTTPException(404, "That photo is not in this patch.")
 
 
+@app.get("/api/known")
+def known(ra0: float, dec0: float, field: float):
+    """Known things in the patch (Gaia fast movers, named objects, known asteroids)."""
+    _ready(ra0, dec0, field)
+    return analysis.known_objects(ra0, dec0, field)
+
+
+@app.get("/api/board")
+def get_board(day: str = ""):
+    from spx import board
+    return board.board(day)
+
+
+@app.post("/api/score")
+async def post_score(request: Request):
+    from spx import board
+    b = await request.json()
+    return board.add_score(b.get("name", ""), int(b.get("score", 0)), b.get("mode", "free"), b.get("day", ""), b.get("rounds", []))
+
+
+@app.post("/api/explored")
+async def post_explored(request: Request):
+    from spx import board
+    b = await request.json()
+    return board.add_explored(b.get("name", ""), float(b["ra"]), float(b["dec"]))
+
+
 @app.get("/api/picks")
 def picks(ra0: float, dec0: float, field: float):
     """Small areas the computer finds interesting (movers, brightness changes, very red objects)."""
