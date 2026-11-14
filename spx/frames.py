@@ -48,6 +48,16 @@ class Cutout:
     variance: np.ndarray
     flags: np.ndarray
     wcs: WCS
+    wave_wcs: WCS | None = None   # detector pixel -> wavelength
+
+    def wavelength_at(self, ra: float, dec: float) -> float:
+        """Wavelength this exposure saw at a given sky position. The filter's colour
+        changes across the detector, so it differs slightly from the centre value."""
+        if self.wave_wcs is None:
+            return self.wavelength
+        x, y = self.wcs.all_world2pix(ra, dec, 0)
+        lam, _ = self.wave_wcs.pixel_to_world_values(x, y)
+        return float(lam) if np.isfinite(lam) else self.wavelength
 
 
 def load_cutout(path: Path, ra: float, dec: float) -> Cutout:
@@ -71,7 +81,7 @@ def load_cutout(path: Path, ra: float, dec: float) -> Cutout:
     # remove whatever smooth sky glow is left (the field is flat on this scale)
     _, sky, _ = sigma_clipped_stats(img[np.isfinite(img)], sigma=3.0)
     img -= sky
-    return Cutout(obs, det, mjd, float(lam), img, var, flags, wcs)
+    return Cutout(obs, det, mjd, float(lam), img, var, flags, wcs, wave_wcs)
 
 
 _WAVE_DIR = Path(__file__).parent / "wave_tables"
@@ -140,13 +150,44 @@ def coadd(cutouts: list[Cutout], grid_wcs: WCS, shape, clip: float = 4.0):
     # saturated star cores disagree so much between exposures that everything gets
     # clipped; fall back to the plain median there rather than leave a hole
     mean = np.where(np.isfinite(mean), mean, med)
-    return fill_holes(mean), np.isfinite(cube).sum(axis=0)
+    # NOTE: pixels with no measurement stay NaN here. Filling is a separate, explicit step
+    # (fill_saturated_cores) so that "no data" is never mistaken for "bright".
+    return mean, np.isfinite(cube).sum(axis=0)
+
+
+def fill_saturated_cores(img: np.ndarray, max_area: int = 80, rounds: int = 6):
+    """Fill ONLY small holes that are completely surrounded by measured pixels: in
+    practice the burnt-out centre of a very bright star, which the archive stores as
+    'no value'. They are painted as bright as their brightest neighbour so the star
+    shows as a solid blob, not a doughnut.
+
+    Holes touching the picture's edge, or large empty areas (no coverage), are left
+    as NaN = 'no data'. Returns (filled image, mask of the pixels that were filled)."""
+    from scipy.ndimage import label
+
+    hole = ~np.isfinite(img)
+    lab, n = label(hole)
+    fillable = np.zeros_like(hole)
+    edge = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])))
+    for k in range(1, n + 1):
+        region = lab == k
+        if k in edge or region.sum() > max_area:
+            continue
+        fillable |= region
+    out = img.copy()
+    todo = fillable.copy()
+    for _ in range(rounds):
+        if not todo.any():
+            break
+        grown = maximum_filter(np.where(np.isfinite(out), out, -np.inf), size=3)
+        ok = todo & np.isfinite(grown) & (grown > -np.inf)
+        out[ok] = grown[ok]
+        todo &= ~ok
+    return out, fillable & np.isfinite(out)
 
 
 def fill_holes(img: np.ndarray, rounds: int = 4) -> np.ndarray:
-    """Pixels with no data at all are almost always the burnt-out centre of a very
-    bright star (the archive stores those as 'no value'). Paint them as bright as
-    their brightest neighbour so the star shows as a solid blob, not a doughnut."""
+    """Old behaviour kept for the step-1 demo script only (fills every hole)."""
     out = img.copy()
     for _ in range(rounds):
         hole = ~np.isfinite(out)
@@ -157,3 +198,70 @@ def fill_holes(img: np.ndarray, rounds: int = 4) -> np.ndarray:
     return out
 
 
+def reject_glitches(cube: np.ndarray, factor: float = 4.0, nsig: float = 10.0) -> int:
+    """In a stack of photos of the same spot from ONE sky pass and ONE detector, blank
+    out pixels that are wildly brighter (or darker) than all the other photos agree on:
+    cosmic-ray hits, satellite glints, afterimages ("persistence") of an earlier bright
+    star. Real objects are in (nearly) every photo, so the per-pixel median ignores the
+    glitch. The limits are loose on purpose (4x the typical value AND 10x the scatter),
+    because a star's brightness genuinely changes by up to ~2-3x across one detector's
+    wavelength range. Works in place; returns how many pixel values were thrown out."""
+    if len(cube) < 3:
+        return 0
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        med = np.nanmedian(cube, axis=0)
+        mad = 1.4826 * np.nanmedian(np.abs(cube - med), axis=0)
+        floor = np.nanmedian(mad)
+        dev = np.abs(cube - med)
+        bad = (dev > nsig * np.maximum(mad, floor)) & (dev > factor * np.abs(med) + nsig * floor)
+    bad &= np.isfinite(cube)
+    cube[bad] = np.nan
+    return int(bad.sum())
+
+
+def stack_like_for_like(cuts_by_pass: dict, grid_wcs: WCS, shape, n_sub: int = 6, min_exposures: int = 4):
+    """Stack one detector's exposures per sky pass so that every pass covers the SAME
+    wavelengths with the SAME weights.
+
+    The detector's wavelength range is split into n_sub narrow slices. In each pass,
+    exposures are stacked slice by slice. A pass's frame is then the plain average of
+    the slices that ALL the well-covered passes have (min_exposures or more photos).
+    So a constant star gives the same brightness in every frame, whatever mix of
+    wavelengths each pass happened to sample. A pass that lacks some of those slices,
+    or has too few photos, is marked 'limited' rather than silently compared.
+
+    Returns {pass_index: dict(img, n, slices_used, slices_total, wl_min, wl_max, limited)}.
+    """
+    allc = [c for cs in cuts_by_pass.values() for c in cs]
+    if not allc:
+        return {}
+    wls = np.array([c.wavelength for c in allc])
+    edges = np.geomspace(wls.min() * 0.999, wls.max() * 1.001, n_sub + 1)
+    slot = lambda c: int(np.clip(np.searchsorted(edges, c.wavelength) - 1, 0, n_sub - 1))  # noqa: E731
+    have = {k: {j for c in cs for j in [slot(c)]} for k, cs in cuts_by_pass.items()}
+    good = [k for k, cs in cuts_by_pass.items() if len(cs) >= min_exposures]
+    common = set(range(n_sub))
+    for k in good:
+        common &= have[k]
+    out = {}
+    for k, cs in cuts_by_pass.items():
+        use = sorted(common & have[k]) if k in good and common else sorted(have[k])
+        # redraw every photo of this pass once, then throw out one-off glitches
+        cube = np.stack([resample(c.image, c.wcs, grid_wcs, shape) for c in cs])
+        n_glitch = reject_glitches(cube)
+        imgs, n = [], 0
+        for j in use:
+            idx = [i for i, c in enumerate(cs) if slot(c) == j]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                imgs.append(np.nanmean(cube[idx], axis=0))
+            n += len(idx)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            img = np.nanmean(imgs, axis=0) if imgs else np.full(shape, np.nan)
+        limited = (k not in good) or (not common) or (len(common) < 0.6 * n_sub) or (set(use) != common)
+        out[k] = dict(img=img, n=n, slices_used=len(use), slices_total=n_sub, glitch_px=n_glitch,
+                      wl_min=float(edges[min(use)]) if use else None,
+                      wl_max=float(edges[max(use) + 1]) if use else None, limited=bool(limited))
+    return out

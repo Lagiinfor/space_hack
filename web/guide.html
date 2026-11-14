@@ -116,8 +116,12 @@
     <p><b>Why the bands matter (the "fair flip-book").</b> SPHEREx has no ordinary filters. Each detector sits behind a
       filter whose colour changes across it, so every single photo sees a given star at a slightly different wavelength.
       If you flipped raw photos, stars would seem to brighten and fade just because the colour changed. So for each
-      detector and each sky pass we <b>stack all the photos</b> (15–25 of them). Every frame in a band then covers the
-      same wavelengths, and only <i>real</i> changes blink.</p>
+      detector and each sky pass we <b>stack the photos</b> (15–25 of them), and we make sure every pass uses the
+      <b>same mix of wavelengths</b>: the detector's range is cut into 6 narrow slices, each slice is stacked on its
+      own, and a frame is the plain average of the slices that every pass has. Then only <i>real</i> changes blink.
+      If a pass is missing some slices, or has too few photos, it is either left out of the blink or labelled
+      <b>"limited comparison"</b>. In the "All colours" view the label says how many of the 6 detectors were fairly
+      comparable and averaged. Places with no measurement at all are drawn with a dark hatch, never as sky.</p>
   </div>
   <ul>
     <li><b>Show</b>: <b>Photos</b> (normal), <b>Changes only</b> (see section 6) or <b>Deepest view</b> (all passes added).</li>

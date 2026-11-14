@@ -33,7 +33,7 @@ async def no_stale_pages(request, call_next):
     return response
 JOBS: dict[str, dict] = {}
 ONE_AT_A_TIME = threading.Lock()  # be polite to the archive: one position at a time
-LATEST = [None]                    # the most recent download request
+LATEST: dict[str, str] = {}        # most recent download request per browser tab
 
 
 @app.get("/api/resolve")
@@ -60,17 +60,17 @@ def tour_list():
         d = dict(t)
         if t["key"] in saved:
             d.update(saved[t["key"]])
-            d["ready"] = flipbook.result_path(round(d["ra"], 4), round(d["dec"], 4), t["field"]).exists()
+            d["ready"] = flipbook.is_current(round(d["ra"], 4), round(d["dec"], 4), t["field"])
         out.append(d)
     return out
 
 
 @app.post("/api/flipbook")
-def start(ra: float, dec: float, field: float = 0.06):
+def start(ra: float, dec: float, field: float = 0.06, client: str = "local"):
     if not (0 <= ra < 360 and -90 <= dec <= 90):
         raise HTTPException(400, "RA must be 0-360 and Dec -90 to +90 degrees.")
     field = min(max(field, 0.02), 0.15)
-    if flipbook.result_path(round(ra, 4), round(dec, 4), field).exists():
+    if flipbook.is_current(round(ra, 4), round(dec, 4), field):
         job_id = "cached-" + uuid.uuid4().hex[:8]
         JOBS[job_id] = dict(state="done", stage="Loaded from your computer", frac=1.0,
                             args=(ra, dec, field))
@@ -79,8 +79,8 @@ def start(ra: float, dec: float, field: float = 0.06):
     job_id = uuid.uuid4().hex[:12]
     job = JOBS[job_id] = dict(state="queued", stage="Stopping the patch you opened before (a few seconds)...",
                               frac=0.0, args=(ra, dec, field))
-    LATEST[0] = job_id            # a newer request makes any older, unfinished one stop
-    stop = lambda: LATEST[0] != job_id  # noqa: E731
+    LATEST[client] = job_id       # a newer request from the same browser tab makes its older one stop
+    stop = lambda: LATEST.get(client) != job_id  # noqa: E731
 
     def run():
         with ONE_AT_A_TIME:
@@ -91,6 +91,7 @@ def start(ra: float, dec: float, field: float = 0.06):
             try:
                 flipbook.build(ra, dec, field, progress=lambda s, f: job.update(stage=s, frac=f), stop=stop)
                 job.update(state="done", stage="Done", frac=1.0)
+                analysis._cache.pop((round(ra, 4), round(dec, 4), field), None)   # forget older copy
                 warm(ra, dec, field)
             except flipbook.Cancelled:
                 job.update(state="cancelled", stage="Replaced by a newer request")
@@ -116,9 +117,7 @@ def result(job_id: str):
     if not job or job["state"] != "done":
         raise HTTPException(404, "Not ready")
     ra, dec, field = job["args"]
-    path = flipbook.result_path(round(ra, 4), round(dec, 4), field)
-    if not path.exists():
-        path = path.with_name(path.stem + "_partial.json")
+    path = flipbook.saved_path(round(ra, 4), round(dec, 4), field)
     return FileResponse(path, media_type="application/json")
 
 
@@ -128,7 +127,7 @@ def warm(ra, dec, field):
 
 
 def _ready(ra, dec, field):
-    if not flipbook.result_path(round(ra, 4), round(dec, 4), field).exists():
+    if not flipbook.saved_path(round(ra, 4), round(dec, 4), field).exists():
         raise HTTPException(404, "Load this position first.")
 
 

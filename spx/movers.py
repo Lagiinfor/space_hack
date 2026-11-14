@@ -1,4 +1,4 @@
-# From the shared engine package (spherex-flipbook/spx/movers.py), unchanged.
+# From the shared engine package (spherex-flipbook/spx/movers.py); changed here: RA differences wrap at 0/360.
 """Blind search for things that moved between sky passes, with no catalogue needed.
 
 Steps:
@@ -17,6 +17,11 @@ from scipy.ndimage import gaussian_filter, maximum_filter
 from scipy.optimize import least_squares
 
 from . import astrometry
+
+
+def dra(a, b):
+    """RA difference a - b in degrees, correct across the 0/360 boundary."""
+    return (a - b + 180.0) % 360.0 - 180.0
 
 
 def find_sources(img: np.ndarray, grid_wcs, min_snr: float = 6.0, edge: int = 4) -> list[dict]:
@@ -66,7 +71,7 @@ def find_movers(images: list, mjds: list[float], grid_wcs, max_rate_arcsec_yr: f
 
     def offsets(a, b):
         """(east, north) offsets in arcsec from source a to every source in list b."""
-        e = np.array([(s["ra"] - a["ra"]) * 3600 * cosd for s in b])
+        e = np.array([dra(s["ra"], a["ra"]) * 3600 * cosd for s in b])
         n = np.array([(s["dec"] - a["dec"]) * 3600 for s in b])
         return e, n
 
@@ -95,7 +100,7 @@ def find_movers(images: list, mjds: list[float], grid_wcs, max_rate_arcsec_yr: f
         if k == ref:
             zero[k], scatter[k] = (0.0, 0.0), 0.0
             continue
-        de = np.array([(t[k]["ra"] - t[ref]["ra"]) * 3600 * cosd for t in tracks if k in t])
+        de = np.array([dra(t[k]["ra"], t[ref]["ra"]) * 3600 * cosd for t in tracks if k in t])
         dn = np.array([(t[k]["dec"] - t[ref]["dec"]) * 3600 for t in tracks if k in t])
         if len(de) >= 5:
             zero[k] = (float(np.median(de)), float(np.median(dn)))
@@ -108,7 +113,7 @@ def find_movers(images: list, mjds: list[float], grid_wcs, max_rate_arcsec_yr: f
     for t in tracks:
         ks = sorted(t)
         tt = np.array([mjds[k] for k in ks]) / 365.25
-        e = np.array([(t[k]["ra"] - t[ref]["ra"]) * 3600 * cosd - zero[k][0] for k in ks])
+        e = np.array([dra(t[k]["ra"], t[ref]["ra"]) * 3600 * cosd - zero[k][0] for k in ks])
         n = np.array([(t[k]["dec"] - t[ref]["dec"]) * 3600 - zero[k][1] for k in ks])
         err = np.array([np.hypot(floor, 9.0 / 2.35 / t[k]["snr"]) for k in ks])
         shift = float(np.hypot(e[-1] - e[0], n[-1] - n[0]))
@@ -141,10 +146,10 @@ def explain_with_gaia(movers: list[dict], gaia: list[dict], mjds: list[float], m
             p0 = astrometry.predict_position(g, mjds[k0])
             p1 = astrometry.predict_position(g, mjds[k1])
             cosd = np.cos(np.radians(p0[1]))
-            sep = np.hypot((p0[0] - m["ra"][0]) * 3600 * cosd, (p0[1] - m["dec"][0]) * 3600)
+            sep = np.hypot(dra(p0[0], m["ra"][0]) * 3600 * cosd, (p0[1] - m["dec"][0]) * 3600)
             if sep > match_arcsec:
                 continue
-            pred_e = (p1[0] - p0[0]) * 3600 * cosd
+            pred_e = dra(p1[0], p0[0]) * 3600 * cosd
             pred_n = (p1[1] - p0[1]) * 3600
             miss = np.hypot(pred_e - m["rate_east"] * years, pred_n - m["rate_north"] * years)
             if best is None or miss < best[0]:

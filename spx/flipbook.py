@@ -32,9 +32,28 @@ def result_path(ra: float, dec: float, field_deg: float) -> Path:
     return place_dir(ra, dec) / f"flipbook_{field_deg:.3f}.json"
 
 
+def saved_path(ra: float, dec: float, field_deg: float) -> Path:
+    """The saved result for a position: the complete one if there is one, else the
+    partial one (some photos missing)."""
+    p = result_path(ra, dec, field_deg)
+    return p if p.exists() else p.with_name(p.stem + "_partial.json")
+
+
+def is_current(ra: float, dec: float, field_deg: float) -> bool:
+    """A saved result exists and was made by the current version of the stacking code."""
+    p = result_path(ra, dec, field_deg)
+    try:
+        return p.exists() and json.loads(p.read_text()).get("version") == RESULT_VERSION
+    except Exception:
+        return False
+
+
 def _pack(a: np.ndarray) -> str:
-    """Float image -> compact text the browser can unpack (base64 of float32)."""
-    return base64.b64encode(np.nan_to_num(a, nan=0.0).astype("<f4").tobytes()).decode()
+    """Float image -> compact text the browser can unpack (base64 of float32).
+    'No data' pixels stay NaN, so the page can show them as no data, not as black sky."""
+    return base64.b64encode(np.asarray(a, dtype="<f4").tobytes()).decode()
+
+RESULT_VERSION = 6   # bump when the way frames are made changes; older saved results are rebuilt
 
 
 class Cancelled(Exception):
@@ -45,7 +64,9 @@ def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage,
     ra, dec = round(ra, 4), round(dec, 4)
     out = result_path(ra, dec, field_deg)
     if out.exists():
-        return json.loads(out.read_text())
+        saved = json.loads(out.read_text())
+        if saved.get("version") == RESULT_VERSION:
+            return saved
     warnings.filterwarnings("ignore")
     cut_deg = round(max(0.1, field_deg * 1.5), 3)
     pdir = place_dir(ra, dec)
@@ -85,20 +106,47 @@ def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage,
         pass_info.append(dict(index=k, label=tm.strftime("%b %Y"), mjd=float(np.mean(mjds)),
                               start=t0.strftime("%Y-%m-%d"), end=t1.strftime("%Y-%m-%d"),
                               n=len(mine)))
-        stacks = []
-        for d in range(1, 7):
-            sel = [c for c in mine if c.detector == d]
-            if not sel:
-                continue
-            img, _ = frames.coadd(sel, grid, shape)
-            stacks.append(img)
-            frame_list.append(dict(pass_index=k, band=d, n=len(sel),
-                                   wl_min=min(c.wavelength for c in sel),
-                                   wl_max=max(c.wavelength for c in sel),
-                                   data=img))
-        if stacks:
-            frame_list.append(dict(pass_index=k, band=0, n=len(mine), wl_min=0.75, wl_max=5.0,
-                                   data=np.nanmean(stacks, axis=0)))
+    # per detector: like-for-like wavelength coverage across passes (see frames.stack_like_for_like)
+    per_det = {}
+    for d in range(1, 7):
+        by_pass = {k: [c for c, p in zip(cuts, passes) if p == k and c.detector == d] for k in range(n_pass)}
+        by_pass = {k: v for k, v in by_pass.items() if v}
+        if by_pass:
+            per_det[d] = frames.stack_like_for_like(by_pass, grid, shape)
+    for d, res in per_det.items():
+        for k, r in res.items():
+            frame_list.append(dict(pass_index=k, band=d, n=r["n"], wl_min=r["wl_min"], wl_max=r["wl_max"],
+                                   slices_used=r["slices_used"], slices_total=r["slices_total"],
+                                   limited=r["limited"], glitch_px=r.get("glitch_px", 0), data=r["img"]))
+    # all detectors together: only detectors that are fairly comparable in every pass they appear in
+    passes_present = sorted({k for res in per_det.values() for k in res})
+    # a detector is "fair" if it has at least two well-covered passes (4+ photos) and
+    # none of those is limited; sparse passes don't disqualify it, they are labelled
+    def fair_det(res):
+        good = [k for k, r in res.items() if r["n"] >= 4]
+        return len(good) >= 2 and all(not res[k]["limited"] for k in good)
+    fair = [d for d, res in per_det.items() if fair_det(res)]
+    # detectors used for "all colours": the fair ones that are fully comparable in every
+    # well-covered pass (24+ photos); if that leaves fewer than two, use all fair ones
+    core = [k for k in passes_present if pass_info[k]["n"] >= 24]
+    common = [d for d in fair if all(k in per_det[d] and not per_det[d][k]["limited"] for k in core)]
+    use = common if len(common) >= 2 else (fair or list(per_det))
+    for k in passes_present:
+        dets = [d for d in use if k in per_det[d]]
+        if not dets:
+            continue
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            img = np.nanmean([per_det[d][k]["img"] for d in dets], axis=0)
+        frame_list.append(dict(pass_index=k, band=0, n=sum(per_det[d][k]["n"] for d in dets),
+                               wl_min=0.75, wl_max=5.0, detectors=dets, n_detectors=len(dets),
+                               limited=bool(set(dets) != set(use) or any(per_det[d][k]["limited"] for d in dets)),
+                               data=img))
+    # fill only burnt-out star centres (enclosed holes); count them so the page can say so
+    for f in frame_list:
+        f["data"], filled = frames.fill_saturated_cores(f["data"])
+        f["filled_px"] = int(filled.sum())
+        f["nodata_px"] = int((~np.isfinite(f["data"])).sum())
 
     # noise level per band, shared by all passes so the blink is fair
     noise = {}
@@ -122,7 +170,13 @@ def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage,
         exposures=[dict(mjd=c.mjd, band=c.detector, wl=c.wavelength, pass_index=int(p), obs_id=c.obs_id)
                    for c, p in zip(cuts, passes)],
         n_images=len(images), n_used=len(cuts),
-        complete=(pdir / "images.json").exists(),
+        # complete only if the archive listing was complete AND every listed photo was
+        # downloaded and read; otherwise the result is shown but not kept, and the next
+        # visit tries the missing photos again
+        complete=(pdir / "images.json").exists() and len(cuts) == len(images),
+        version=RESULT_VERSION,
+        built=Time.now().strftime("%Y-%m-%d"),
+        collections=archive.COLLECTIONS,
     )
     # if part of the archive was down, show what we have but don't keep it, so the
     # next visit tries again for the full set

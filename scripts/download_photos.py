@@ -24,7 +24,7 @@ else:
 
 for ra, dec, field in positions:
     print(f"\nRA {ra}  Dec {dec}:")
-    if not flipbook.result_path(round(ra, 4), round(dec, 4), field).exists():
+    if not flipbook.is_current(round(ra, 4), round(dec, 4), field):
         # a brand-new position: find, download and stack everything
         flipbook.build(ra, dec, field, progress=lambda s, f: print("  " + s, end="\r"))
     pos = analysis.load_position(ra, dec, field)  # downloads any missing photos

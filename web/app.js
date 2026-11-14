@@ -5,6 +5,7 @@
 const $ = (id) => document.getElementById(id);
 const GAIA_GMAX = 16.5;
 const MIN_EXPOSURES = 6;
+const TAB_ID = Math.random().toString(36).slice(2, 10);   // lets the server tell browser tabs apart
 // a colour per detector for the band buttons: short (bluish) to long (red) infrared
 const BAND_COLORS = { 1: "#7aa2ff", 2: "#62c7ff", 3: "#5fe0c0", 4: "#c6e66a", 5: "#ffb35c", 6: "#ff6f61" };
 const LENS_ICONS = { color: "🌈", methane: "🟣", ice: "🧊", co2: "💨" };
@@ -128,7 +129,7 @@ async function load(ra, dec, field, keepBand) {
   showProgress("Starting...", 0.01);
   $("error").textContent = "";
   const token = (S.loadToken = (S.loadToken || 0) + 1);   // a newer click makes this one step aside
-  const { job } = await api(`/api/flipbook?ra=${ra}&dec=${dec}&field=${field}`, { method: "POST" });
+  const { job } = await api(`/api/flipbook?ra=${ra}&dec=${dec}&field=${field}&client=${TAB_ID}`, { method: "POST" });
   while (true) {
     if (token !== S.loadToken) return;
     const st = await api(`/api/job/${job}`);
@@ -201,7 +202,7 @@ function framesForBand() {
 }
 function blinkFrames() {
   // a pass with only a handful of exposures in this band is too noisy to compare fairly
-  const all = framesForBand(), ok = all.filter((f) => f.n >= MIN_EXPOSURES);
+  const all = framesForBand(), ok = all.filter((f) => f.n >= MIN_EXPOSURES && !f.limited);
   const fs = ok.length >= 2 ? ok : all;
   return S.blinkset === "ends" && fs.length > 2 ? [fs[0], fs[fs.length - 1]] : fs;
 }
@@ -270,6 +271,12 @@ function boxSmooth(a, n) {
   }
   return out;
 }
+function nanMean(arrs, len) {
+  const out = new Float32Array(len), cnt = new Uint16Array(len);
+  for (const a of arrs) for (let i = 0; i < len; i++) if (Number.isFinite(a[i])) { out[i] += a[i]; cnt[i]++; }
+  for (let i = 0; i < len; i++) out[i] = cnt[i] ? out[i] / cnt[i] : NaN;
+  return out;
+}
 function robustSigma(a) {
   const v = Array.from(a).filter(Number.isFinite).sort((p, q) => p - q);
   const med = v[v.length >> 1];
@@ -318,13 +325,11 @@ function draw() {
     const { vmax, soft } = stretchParams(all);
     let ref = null, data = f.arr;
     if (S.view === "diff") {
-      ref = new Float32Array(n * n);
-      for (const g of fs) for (let i = 0; i < n * n; i++) ref[i] += g.arr[i] / fs.length;
+      ref = nanMean(fs.map((g) => g.arr), n * n);
     } else if (S.view === "first") {
       ref = fs[0].arr;
     } else if (S.view === "stack") {
-      data = new Float32Array(n * n);
-      for (const g of fs) for (let i = 0; i < n * n; i++) data[i] += g.arr[i] / fs.length;
+      data = nanMean(fs.map((g) => g.arr), n * n);
     }
     const norm = Math.asinh(vmax / soft);
     // differences: smooth over one SPHEREx pixel (the grid is half-pixel) and measure the
@@ -339,7 +344,11 @@ function draw() {
     }
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
       const src = (n - 1 - y) * n + x, o = (y * n + x) * 4;
-      if (ref) {
+      if (!Number.isFinite(data[src]) || (ref && !Number.isFinite(ref[src]))) {
+        // no measurement here: shown as no data, never as sky or as a change
+        const hatch = ((x + y) % 6 < 3) ? 34 : 26;
+        px[o] = hatch; px[o + 1] = hatch + 2; px[o + 2] = hatch + 10;
+      } else if (ref) {
         const d = D[src];
         const v = Math.abs(d) < dsoft * 1.5 ? 0 : Math.max(-1, Math.min(1, Math.asinh(d / dsoft) / dnorm));
         const a = Math.sqrt(Math.abs(v));
@@ -352,7 +361,9 @@ function draw() {
       px[o + 3] = 255;
     }
     // problem-flag tint
-    if (S.flags && S.flagLayer) {
+    const flagsOk = S.flags && S.flags.key === `${f.pass_index}-${S.band}` && S.flags.pos === posQuery();
+    if (S.flagLayer && !flagsOk) loadFlags();
+    if (S.flagLayer && flagsOk) {
       const layer = S.flags.layers.find((l) => l.name === S.flagLayer);
       if (layer) for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
         const v = layer.arr[(n - 1 - y) * n + x];
@@ -365,10 +376,13 @@ function draw() {
     const p = S.R.passes[f.pass_index];
     const viewTxt = { normal: "", diff: " (difference)", first: ` (minus ${S.R.passes[fs[0].pass_index].label})`, stack: "" }[S.view];
     label = S.view === "stack" ? "All passes added" : p.label + viewTxt;
-    const bandName = S.band === 0 ? "all 6 bands averaged" : `${f.wl_min.toFixed(2)}–${f.wl_max.toFixed(2)} µm`;
+    const bandName = S.band === 0 ? `${f.n_detectors ?? 6} of 6 detectors averaged`
+      : (f.wl_min ? `${f.wl_min.toFixed(2)}–${f.wl_max.toFixed(2)} µm, same wavelength mix in every pass` : "");
     const nimg = S.view === "stack" ? fs.reduce((s, g) => s + g.n, 0) : f.n;
     const skipped = all.filter((g) => !fs.includes(g)).map((g) => S.R.passes[g.pass_index].label);
-    sub = `${nimg} exposures stacked · ${bandName}` + (skipped.length ? ` · skipping ${skipped.join(", ")} (too few exposures)` : "");
+    sub = `${nimg} exposures used · ${bandName}` +
+      (skipped.length ? ` · ${skipped.join(", ")} left out (too few photos or missing wavelengths)` : "") +
+      (f.limited && fs.includes(f) ? " · LIMITED COMPARISON: this pass lacks some wavelengths" : "");
     for (const [i, b] of [...$("passes").children].entries()) b.classList.toggle("on", i === S.frameIdx % fs.length && S.view !== "stack");
   }
   octx.putImageData(img, 0, 0);
@@ -466,7 +480,7 @@ function listExposures() {
 
 function drawLegend() {
   const el = $("legend");
-  if (S.mode === "flip" && S.flags && S.flagLayer) {
+  if (S.mode === "flip" && S.flags && S.flagLayer && S.flags.key === `${currentFrame().pass_index}-${S.band}`) {
     const layer = S.flags.layers.find((l) => l.name === S.flagLayer);
     el.innerHTML = `<span style="color:#ffbe00">■</span> ${S.flagLayer}: flagged in up to ${Math.round(layer.max * 100)}% of the ${S.flags.n} exposures in this pass`;
     el.classList.remove("hidden");
@@ -479,6 +493,7 @@ function drawLegend() {
   } else el.classList.add("hidden");
 }
 
+function speedMs() { return 800 / (parseFloat($("speed").value) || 1); }   // ×0.25 … ×2
 function step(k) { const n = blinkFrames().length; S.frameIdx = (S.frameIdx + k + n) % n; draw(); }
 function play(on) {
   S.playing = on;
@@ -486,10 +501,10 @@ function play(on) {
   const tick = () => {
     if (!S.playing) return;
     if (S.mode === "flip" && S.view !== "stack") step(1);
-    S.timer = setTimeout(tick, +$("speed").value);
+    S.timer = setTimeout(tick, speedMs());
   };
   draw();
-  if (on) S.timer = setTimeout(tick, +$("speed").value);
+  if (on) S.timer = setTimeout(tick, speedMs());
   $("play").textContent = S.playing ? "❚❚" : "▶";
 }
 
@@ -553,7 +568,10 @@ function showLensBusy(on) {
 async function loadGaia() {
   $("gaiainfo").textContent = "Asking the Gaia archive for stars here...";
   try {
-    S.gaia = await api(`/api/gaia?${posQuery()}`);
+    const forPos = posQuery();
+    const g = await api(`/api/gaia?${forPos}`);
+    if (!S.R || forPos !== posQuery()) return;   // the person moved to another patch meanwhile
+    S.gaia = g;
     const fast = S.gaia.stars.filter((s) => s.pm > 200);
     $("gaiainfo").textContent = `Gaia DR3: ${S.gaia.n} stars brighter than G=19 in view` +
       (fast.length ? `, ${fast.length} fast mover${fast.length > 1 ? "s" : ""} (over 0.2″/yr): ` +
@@ -562,16 +580,21 @@ async function loadGaia() {
   refresh();
 }
 
+let flagsPending = "";
 async function loadFlags() {
   if (!S.flagLayer || S.mode !== "flip" || !S.R) { draw(); return; }
   const f = currentFrame();
-  const key = `${f.pass_index}-${S.band}`;
-  if (S.flags && S.flags.key === key) { draw(); return; }
+  const key = `${f.pass_index}-${S.band}`, full = `${posQuery()}|${key}`;
+  if (S.flags && S.flags.key === key && S.flags.pos === posQuery()) return;
+  if (flagsPending === full) return;               // already being fetched
+  flagsPending = full;
   try {
     const F = await api(`/api/flags?${posQuery()}&pass_index=${f.pass_index}&band=${S.band}`);
     for (const l of F.layers) l.arr = unpack(l.data);
-    F.key = key; S.flags = F;
-  } catch (e) { S.flags = null; }
+    F.key = key; F.pos = full.split("|")[0];
+    if (flagsPending === full) S.flags = F;        // only if it is still the frame we want
+  } catch (e) { /* keep showing the picture without flags */ }
+  if (flagsPending === full) flagsPending = "";
   draw();
 }
 
@@ -590,7 +613,9 @@ async function loadMovers() {
           `${m.status.split(":")[0].toUpperCase()}</b>: ${m.rate.toFixed(1)}″/yr to the ${dir(m)}, ` +
           `${m.track[0][0].toFixed(0)}″ E ${m.track[0][1].toFixed(0)}″ N of centre (seen in ${bandTxt(m.band)}, ` +
           `${m.sigma.toFixed(0)}× the field's position noise). ${m.status.split(":")[1] || ""}</li>`).join("") + "</ul>"
-      : "Nothing in this field moved by more than the measuring noise between passes.";
+      : "No moving objects found by this search (objects bright enough to detect in the stacked pictures, " +
+        "moving steadily by more than about 1.5″ between passes and up to 12″ per year). Fainter or much faster " +
+        "objects, such as asteroids, would not be caught.";
     draw();
   } catch (e) { $("moverlist").textContent = "Mover search failed: " + e.message; }
 }
@@ -630,7 +655,10 @@ async function clickSpectrum(e) {
   $("specinfo").textContent = `Measuring at RA ${sky.ra.toFixed(5)}°, Dec ${sky.dec.toFixed(5)}° in every exposure...`;
   $("specwarn").classList.add("hidden");
   try {
-    S.spec = await api(`/api/spectrum?${posQuery()}&ra=${sky.ra}&dec=${sky.dec}`);
+    const ticket = (S.specTicket = (S.specTicket || 0) + 1);
+    const sp = await api(`/api/spectrum?${posQuery()}&ra=${sky.ra}&dec=${sky.dec}`);
+    if (ticket !== S.specTicket) return;      // a newer click is already on its way
+    S.spec = sp;
     plotSpectrum();
     draw();
   } catch (e2) { $("specinfo").textContent = "Could not measure here: " + e2.message; }
@@ -710,7 +738,7 @@ function moveText(fol) {
   const a = fol[ks[0]], b = fol[ks[ks.length - 1]];
   const d = Math.hypot(b.east - a.east, b.north - a.north);
   const yrs = (S.R.passes[ks[ks.length - 1]].mjd - S.R.passes[ks[0]].mjd) / 365.25;
-  if (d < 2.5) return "Position steady between passes (within the measuring precision).";
+  if (d < 2.5) return "No motion detected between passes (within about 2.5″, the measuring precision here).";
   const dir = (b.north - a.north > 0 ? "north" : "south") + "-" + (b.east - a.east > 0 ? "east" : "west");
   return `Moved ${d.toFixed(1)}″ ${dir} in ${yrs.toFixed(1)} years (≈${(d / yrs).toFixed(1)}″/yr). Coloured dots mark where it was found in each pass.`;
 }
@@ -752,7 +780,7 @@ async function saveGif() {
   $("sharemsg").textContent = "Making the GIF...";
   try {
     const r = await fetch("/api/gif", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ frames, ms: +$("speed").value }) });
+      body: JSON.stringify({ frames, ms: speedMs() }) });
     if (!r.ok) throw new Error(r.statusText);
     const url = URL.createObjectURL(await r.blob());
     const a = document.createElement("a");
@@ -770,13 +798,13 @@ async function loadTour() {
 async function startTour(t) {
   S.tourKey = t.key;
   S.band = t.band; S.mode = "flip"; S.view = "normal"; $("view").value = "normal";
-  $("field").value = String(t.field);
+  const field = parseFloat($("field").value) || t.field;   // keep the size the person picked on the card
   history.replaceState(null, "", "?");
   try {
     if (t.ra !== undefined) {
       $("where").value = `${t.ra} ${t.dec}`;
       $("resolved").textContent = t.how ? `→ ${t.how}` : "";
-      await load(t.ra, t.dec, t.field, true);
+      await load(t.ra, t.dec, field, true);
     } else await go(t.query);
   } catch (e) { fail(e.message); }
 }
@@ -839,6 +867,7 @@ function wire() {
       (g && g.d < 6 ? ` · Gaia star G=${g.s.g}, moves ${(g.s.pm / 1000).toFixed(3)}″/yr` : "");
   });
   document.addEventListener("keydown", (e) => {
+    if (!S.R || !document.body.classList.contains("on-explore")) return;
     if (e.target.tagName === "INPUT" && e.target.type === "text") return;
     if (e.target.tagName === "SELECT") return;
     if (e.key === " ") { e.preventDefault(); play(!S.playing); }

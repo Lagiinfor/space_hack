@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="style.css?v=13">
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
 <script src="vendor/plotly.min.js" defer></script>
-<script src="app.js?v=15" defer></script>
+<script src="app.js?v=20" defer></script>
 <script type="module" src="picker.js?v=13"></script>
 </head>
 <body class="on-pick">
@@ -152,7 +152,11 @@
 
         <details class="more">
           <summary>More controls</summary>
-          <div class="row slider"><span>Speed</span><input type="range" id="speed" min="150" max="2000" step="50" value="700"></div>
+          <div class="row slider"><span>Speed</span>
+            <select id="speed" title="How fast the frames change">
+              <option value="0.25">×0.25 (slow)</option><option value="0.5">×0.5</option>
+              <option value="1" selected>×1</option><option value="2">×2 (fast)</option>
+            </select></div>
           <div class="row slider"><span>Brightness</span><input type="range" id="bright" min="0" max="100" value="35"></div>
           <div class="row slider"><span>Faint stars</span><input type="range" id="soft" min="0" max="100" value="40"></div>
           <div class="row wrap">

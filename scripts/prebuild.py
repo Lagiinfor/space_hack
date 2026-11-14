@@ -18,7 +18,8 @@ saved = json.loads(tour_file.read_text()) if tour_file.exists() else {}
 for t in TOUR:
     if only and t["key"] not in only:
         continue
-    pos = resolve(t["query"])
+    # reuse the position already saved for the tour (so its downloaded photos are reused)
+    pos = saved[t["key"]] if t["key"] in saved else resolve(t["query"])
     t0 = time.time()
     print(f"{t['name']}: {pos['ra']:.4f} {pos['dec']:+.4f}", flush=True)
     try:

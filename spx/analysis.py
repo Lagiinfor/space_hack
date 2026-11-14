@@ -47,7 +47,7 @@ _loading: dict = {}
 
 
 def _load(ra, dec, field_deg, key):
-    res = json.loads(flipbook.result_path(ra, dec, field_deg).read_text())
+    res = json.loads(flipbook.saved_path(ra, dec, field_deg).read_text())
     cut_deg = round(max(0.1, field_deg * 1.5), 3)
     cdir = flipbook.place_dir(ra, dec) / f"cutouts_{cut_deg}"
     # The shared copy of the project (GitHub) carries the stacked pictures but not the
@@ -57,7 +57,7 @@ def _load(ra, dec, field_deg, key):
         from . import archive
         images = json.loads(listing.read_text())
         have = len(list(cdir.glob("*.fits"))) if cdir.exists() else 0
-        if have < 0.9 * len(images):
+        if have < len(images):   # any missing photo is tried again (already-saved ones are skipped)
             print(f"  downloading the single photos for RA {ra} Dec {dec} (needed for spectra and lenses)...")
             archive.fetch_all(images, ra, dec, cut_deg, cdir)
     cuts = []
@@ -66,7 +66,13 @@ def _load(ra, dec, field_deg, key):
             cuts.append(frames.load_cutout(p, ra, dec))
         except Exception:
             pass
-    passes = frames.assign_passes([c.mjd for c in cuts])
+    # use the SAME pass numbers as the saved pictures (not a fresh guess), so spectra,
+    # flags and lenses always talk about the same sky passes as the flip-book
+    saved = {(e.get("obs_id"), e["band"]): e["pass_index"] for e in res.get("exposures", [])}
+    if all((c.obs_id, c.detector) in saved for c in cuts):
+        passes = np.array([saved[(c.obs_id, c.detector)] for c in cuts])
+    else:
+        passes = frames.assign_passes([c.mjd for c in cuts])
     entry = dict(result=res, cuts=cuts, passes=passes, ra=ra, dec=dec, field=field_deg)
     with _lock:
         _cache[key] = entry
@@ -104,7 +110,7 @@ def _aperture_flux(c: frames.Cutout, ra: float, dec: float, r_ap: float = 2.0,
     w_total = frac[inside].sum()
     w_good = frac[good].sum()
     if w_good < 0.6 * w_total:
-        return None
+        return "burnt"           # centre has no values: a saturated star
     flux = np.sum((img[good] - bkg) * frac[good]) * (w_total / w_good)
     err = np.sqrt(np.nansum(np.clip(var[good], 0, None) * frac[good] ** 2)) * (w_total / w_good)
     sat = bool(np.any(c.flags[inside & (frac > 0.3)] & frames.SATURATED) or (w_good < 0.98 * w_total))
@@ -173,7 +179,7 @@ def _follow(pos: dict, ra: float, dec: float, max_shift_px: float = 3.0) -> dict
     for (b, k), (a, nz) in stacks.items():
         if b != best_band:
             continue
-        sub = np.where(near, a, -np.inf)
+        sub = np.where(near & np.isfinite(a), a, -np.inf)
         j = np.unravel_index(np.argmax(sub), sub.shape)
         if a[j] < 5 * nz:
             continue
@@ -193,19 +199,21 @@ def spectrum(ra0: float, dec0: float, field_deg: float, ra: float, dec: float, f
     meas = []
     for c, p in zip(pos["cuts"], pos["passes"]):
         r_, d_ = where.get(int(p), (ra, dec, 0))[:2]
-        meas.append((c, p, r_, d_, _aperture_flux(c, r_, d_)))
+        m = _aperture_flux(c, r_, d_)
+        meas.append((c, p, r_, d_, m))
     # if the centre is burnt out in many exposures, switch every exposure to the
     # outer-glow ring so all points are measured the same way
-    n_burnt = sum(1 for *_, m in meas if m is None or m[3])
+    # 'burnt' = centre saturated; None = off the edge / no coverage (not counted as saturation)
+    n_burnt = sum(1 for *_, m in meas if m == "burnt" or (isinstance(m, tuple) and m[3]))
     wing = n_burnt > 0.3 * len(meas)
     pts = []
     for c, p, r_, d_, m in meas:
         if wing:
             w = _wing_flux(c, r_, d_)
             m = (w[0], w[1], 0.0, False) if w else None
-        if m is None or not np.isfinite(m[0]):
+        if not isinstance(m, tuple) or not np.isfinite(m[0]):
             continue
-        pts.append(dict(wl=round(c.wavelength, 4), flux=m[0], err=m[1], band=c.detector,
+        pts.append(dict(wl=round(c.wavelength_at(r_, d_), 4), flux=m[0], err=m[1], band=c.detector,
                         pass_index=int(p), mjd=c.mjd, sat=m[3]))
     # One-off bad photos (a cosmic-ray hit, a satellite) give single points far off the
     # rest. A point is flagged as an outlier when it disagrees with the photos taken at
@@ -241,7 +249,7 @@ def spectrum(ra0: float, dec0: float, field_deg: float, ra: float, dec: float, f
         curves.append(dict(pass_index=k, wl=xs, flux=ys))
     n_sat = int(n_burnt)
     cosd = np.cos(np.radians(dec))
-    followed = {int(k): dict(ra=v[0], dec=v[1], east=(v[0] - ra) * 3600 * cosd, north=(v[1] - dec) * 3600)
+    followed = {int(k): dict(ra=v[0], dec=v[1], east=((v[0] - ra + 180) % 360 - 180) * 3600 * cosd, north=(v[1] - dec) * 3600)
                 for k, v in where.items()}
     return dict(ra=ra, dec=dec, points=pts, curves=curves, n=len(pts), n_saturated=n_sat,
                 passes=pos["result"]["passes"], followed=followed, wing=wing)
@@ -281,7 +289,7 @@ def lens(ra0: float, dec0: float, field_deg: float, key: str, pass_index: int | 
             img, _ = frames.coadd(sel, grid, shape)
         else:
             img = np.zeros(shape)
-        chans.append(np.nan_to_num(img))
+        chans.append(np.nan_to_num(frames.fill_saturated_cores(img)[0]))
     # white balance: ratio of each channel to the middle one, measured on the
     # bright-but-not-extreme pixels (mostly ordinary stars)
     ref = chans[1]
@@ -346,7 +354,7 @@ def gaia(ra0: float, dec0: float, field_deg: float, gmax: float = 19.0) -> dict:
     (proper motion + parallax, as seen from Earth)."""
     ra0, dec0 = round(ra0, 4), round(dec0, 4)
     cache = flipbook.place_dir(ra0, dec0) / f"gaia_{field_deg:.3f}.json"
-    res = json.loads(flipbook.result_path(ra0, dec0, field_deg).read_text())
+    res = json.loads(flipbook.saved_path(round(ra0, 4), round(dec0, 4), field_deg).read_text())
     if cache.exists():
         stars = json.loads(cache.read_text())
     else:
@@ -384,7 +392,7 @@ def gaia(ra0: float, dec0: float, field_deg: float, gmax: float = 19.0) -> dict:
         a_, dd = np.radians(r_), np.radians(d_)
         r_ = r_ + plx * (X * np.sin(a_) - Y * np.cos(a_)) / np.cos(dd)
         d_ = d_ + plx * (X * np.cos(a_) * np.sin(dd) + Y * np.sin(a_) * np.sin(dd) - Z * np.cos(dd))
-        tracks.append(np.stack([(r_ - ra0) * 3600 * cosd, (d_ - dec0) * 3600], axis=1))
+        tracks.append(np.stack([((r_ - ra0 + 180) % 360 - 180) * 3600 * cosd, (d_ - dec0) * 3600], axis=1))
     tracks = np.stack(tracks, axis=1)  # star, pass, (east, north)
     half = field_deg * 1800
     out = []
@@ -437,7 +445,7 @@ def movers(ra0: float, dec0: float, field_deg: float) -> dict:
     out = []
     for m in found:
         out.append(dict(status=m["status"], band=m["band"], passes=m["passes"],
-                        track=[[(r_ - pos["ra"]) * 3600 * cosd, (d_ - pos["dec"]) * 3600] for r_, d_ in zip(m["ra"], m["dec"])],
+                        track=[[mv.dra(r_, pos["ra"]) * 3600 * cosd, (d_ - pos["dec"]) * 3600] for r_, d_ in zip(m["ra"], m["dec"])],
                         rate=float(np.hypot(m["rate_east"], m["rate_north"])),
                         rate_east=m["rate_east"], rate_north=m["rate_north"],
                         shift=m["shift_arcsec"], sigma=m["sigma"], snr=m["snr"],

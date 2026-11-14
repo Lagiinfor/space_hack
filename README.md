@@ -114,3 +114,27 @@ Parameters: `ra`, `dec` (degrees), `field` (degrees: 0.04, 0.06, 0.1, 0.15), `ba
    uses its 2026 position.
 6. **Windows file locking**: cutouts are read without memory-mapping so cached files can be deleted while the
    server runs.
+
+## Fairness and quality checks (after the outside code review, 14 Nov 2026)
+
+- **Same wavelength mix in every pass.** Each detector's range is cut into 6 narrow slices; each slice is stacked on
+  its own and a frame is the plain average of the slices every well-covered pass has. Passes that miss slices or have
+  too few photos are left out of the blink or labelled "limited comparison". "All colours" says how many detectors it
+  averaged (only those fairly comparable in every pass).
+- **No invented pixels.** Only small holes fully surrounded by data (burnt-out star centres) are filled; anything else
+  stays "no data" and is drawn hatched.
+- **One-off glitches thrown out.** Within a pass and detector, a pixel far brighter than all other photos agree on
+  (cosmic ray, satellite glint, afterimage) is discarded before stacking. This removed the "blob" Lavi found near
+  WISE 0855 in May 2026: it came from 1 of 99 photos (flagged TRANSIENT) plus 2 afterimages (flagged PERSIST); no known
+  asteroid was there (checked with IMCCE SkyBoT).
+- **Honest completeness.** A result is saved as complete only if every listed photo was downloaded and read; otherwise
+  missing photos are retried on the next visit. Saved results carry a version number and build date and are rebuilt
+  when the stacking method changes.
+- **Spectra use the wavelength at the clicked spot**, follow movers, mark one-off bad photos, and separate
+  "burnt-out centre" from "off the edge".
+- **Automatic checks:** `.venv\Scripts\python scripts\self_test.py` (constant star stays constant, missing data is not
+  filled, glitches removed, RA wrap, steady field star within 5%, Barnard's Star and Eps Indi B found as known movers,
+  WISE 0855 found as a candidate, no false movers on RW Aur and R Dra).
+
+Not done yet: a "check NASA for newer photos" button (saved results do record their date), and passes are still split
+by 60-day gaps (fine for SPHEREx's real schedule; an unusual observing pattern could merge passes).
