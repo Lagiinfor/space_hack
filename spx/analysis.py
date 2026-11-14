@@ -207,11 +207,29 @@ def spectrum(ra0: float, dec0: float, field_deg: float, ra: float, dec: float, f
             continue
         pts.append(dict(wl=round(c.wavelength, 4), flux=m[0], err=m[1], band=c.detector,
                         pass_index=int(p), mjd=c.mjd, sat=m[3]))
+    # One-off bad photos (a cosmic-ray hit, a satellite) give single points far off the
+    # rest. A point is flagged as an outlier when it disagrees with the photos taken at
+    # nearly the same wavelength in the same sky pass by much more than their scatter.
+    # Real changes move a whole pass together, so they are not affected. Outliers stay on
+    # the plot (faded) but are left out of the lines.
+    for q in pts:
+        q["outlier"] = False
+    for k in {q["pass_index"] for q in pts}:
+        mine = [q for q in pts if q["pass_index"] == k]
+        wl = np.array([q["wl"] for q in mine]); fl = np.array([q["flux"] for q in mine])
+        for i, q in enumerate(mine):
+            near = (np.abs(wl - q["wl"]) < 0.035 * q["wl"]) & (np.arange(len(mine)) != i)
+            if near.sum() < 2:
+                continue
+            ref = np.median(fl[near])
+            spread = max(1.4826 * np.median(np.abs(fl[near] - ref)), q["err"], 0.08 * abs(ref))
+            if abs(q["flux"] - ref) > 5 * spread:
+                q["outlier"] = True
     # smooth curve per pass: median in wavelength bins about as wide as SPHEREx's resolution
     edges = np.exp(np.linspace(np.log(0.74), np.log(5.02), 56))
     curves = []
     for k in sorted({q["pass_index"] for q in pts}):
-        mine = [q for q in pts if q["pass_index"] == k]
+        mine = [q for q in pts if q["pass_index"] == k and not q["outlier"]]
         wl = np.array([q["wl"] for q in mine])
         fl = np.array([q["flux"] for q in mine])
         xs, ys = [], []

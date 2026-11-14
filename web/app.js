@@ -632,13 +632,15 @@ function plotSpectrum() {
     traces.push({
       x: pts.map((q) => q.wl), y: pts.map((q) => q.flux), mode: "markers", type: "scatter",
       name: p.label + " exposures", legendgroup: p.label, showlegend: false,
-      marker: { size: 4, color: col, opacity: 0.45, symbol: pts.map((q) => q.sat ? "x" : "circle") },
+      marker: { size: 4, color: col, opacity: pts.map((q) => q.outlier ? 0.2 : 0.45),
+        symbol: pts.map((q) => q.outlier ? "circle-open" : q.sat ? "x" : "circle") },
       error_y: { type: "data", array: pts.map((q) => q.err), visible: true, color: col, thickness: 0.6, width: 0 },
-      hovertemplate: "%{x:.3f} µm<br>%{y:.3g} mJy<extra>" + p.label + "</extra>",
+      text: pts.map((q) => q.outlier ? "<br>(one-off bad photo: left out of the line)" : ""),
+      hovertemplate: "%{x:.3f} µm<br>%{y:.3g} mJy%{text}<extra>" + p.label + "</extra>",
     });
     traces.push({
       x: c.wl, y: c.flux, mode: "lines", type: "scatter", name: p.label, legendgroup: p.label,
-      line: { color: col, width: 2.5, shape: "spline", smoothing: 0.6 },
+      line: { color: col, width: 2.5, shape: "spline", smoothing: 0.3 },
       hovertemplate: "%{x:.2f} µm<br>%{y:.3g} mJy<extra>" + p.label + "</extra>",
     });
   }
@@ -650,7 +652,7 @@ function plotSpectrum() {
     xaxis: { title: "Wavelength (µm)", gridcolor: "#30363d", range: [0.7, 5.05], zeroline: false },
     yaxis: { title: sp.wing ? "Outer-glow brightness (mJy)" : "Brightness (mJy)", gridcolor: "#30363d", type: S.logy ? "log" : "linear", zeroline: false,
       // ignore a few wild single-photo points when choosing the scale (they stay on the plot; zoom out to see them)
-      ...(S.logy ? {} : { range: robustRange(sp.points.map((q) => q.flux)) }) },
+      ...(S.logy ? {} : { range: robustRange(sp.points.filter((q) => !q.outlier).map((q) => q.flux)) }) },
     legend: { orientation: "h", y: 0.99, yanchor: "top", x: 0, yref: "container" },
     shapes: [
       // molecule bands, as faint shading
