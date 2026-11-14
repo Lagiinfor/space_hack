@@ -12,3 +12,12 @@ data/**/*_partial.json
 # Odds and ends
 .DS_Store
 Thumbs.db
+
+# Only the five tour targets' small results are shared; other spots you open stay on your computer
+data/*
+!data/tour.json
+!data/ra133.7593_dec-7.2421/
+!data/ra248.1672_dec+66.7550/
+!data/ra269.4464_dec+4.7686/
+!data/ra331.0970_dec-56.8008/
+!data/ra76.9566_dec+30.4013/
