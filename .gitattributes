@@ -1,0 +1,4 @@
+# keep Windows line endings in start.bat exactly as they are (also in the ZIP download)
+*.bat -text
+*.fits binary
+*.jpg binary

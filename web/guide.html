@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flip-book Guide</title>
+<link rel="stylesheet" href="style.css?v=3">
+<style>
+  .guide { max-width: 860px; margin: 0 auto; padding: 8px 20px 60px; }
+  .guide h2 { font-size: 20px; margin: 34px 0 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+  .guide h3 { font-size: 16px; margin: 20px 0 6px; color: #cdd9e5; }
+  .guide p, .guide li { color: #c9d1d9; font-size: 15px; line-height: 1.6; }
+  .guide li { margin-bottom: 6px; }
+  .guide .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+  .guide .try { border-left: 3px solid var(--accent); }
+  .guide .careful { border-left: 3px solid var(--warn); }
+  .guide nav { columns: 2; column-gap: 28px; font-size: 14px; }
+  .guide nav a { display: block; padding: 2px 0; text-decoration: none; }
+  @media (max-width: 600px) { .guide nav { columns: 1; } .guide { padding: 6px 12px 40px; } }
+  .guide table { margin: 8px 0; }
+  .guide td, .guide th { font-size: 14px; vertical-align: top; }
+  .guide kbd { background: #21262d; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 13px; }
+  .back { display: inline-block; margin: 14px 0 0; }
+  .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: -1px; margin-right: 3px; }
+</style>
+</head>
+<body>
+<div class="guide">
+  <a class="back" href="/">← Back to the flip-book</a>
+  <h1 style="margin-top:12px">Guide to the SPHEREx Sky Flip-book</h1>
+  <p>This page explains everything on the website: what you are looking at, what each button does, and what to try
+    on the five NASA test targets. No astronomy or software background is needed.</p>
+
+  <nav class="box">
+    <a href="#idea">1. The idea in one minute</a>
+    <a href="#terms">2. Words you will see</a>
+    <a href="#start">3. Opening a patch of sky</a>
+    <a href="#picture">4. Reading the picture</a>
+    <a href="#flip">5. The flip-book and its controls</a>
+    <a href="#diff">6. Difference views</a>
+    <a href="#spectrum">7. Click for a spectrum</a>
+    <a href="#movers">8. Automatic mover search</a>
+    <a href="#gaia">9. Gaia stars overlay</a>
+    <a href="#lenses">10. Molecule lenses</a>
+    <a href="#flags">11. Problem flags and the exposure list</a>
+    <a href="#share">12. Sharing and saving</a>
+    <a href="#tour">13. The five test targets: what to try</a>
+    <a href="#limits">14. Honest limits</a>
+    <a href="#how">15. How it works behind the scenes</a>
+  </nav>
+
+  <h2 id="idea">1. The idea in one minute</h2>
+  <p><b>SPHEREx</b> is a NASA space telescope launched in 2025. It photographs the <i>whole sky</i> about every six
+    months, in infrared light (heat light, invisible to our eyes), split into 102 colours instead of the 3 a normal
+    camera uses.</p>
+  <p>Most things in the sky stay put. Things that are <b>close to us</b> (nearby stars, brown dwarfs, asteroids)
+    shift position between photos taken months apart. Some stars also <b>change brightness</b>. If you flip between
+    photos of the same patch taken at different times, anything that jumps or flickers stands out. That is how Pluto was
+    discovered.</p>
+  <p>This website does that flipping for any patch of sky you choose, and adds things no older tool does: the
+    <b>spectrum</b> (brightness at every infrared colour) of any object you click, in each sky pass, and
+    <b>molecule lenses</b> that make objects with unusual chemistry (like methane) stand out.</p>
+
+  <h2 id="terms">2. Words you will see</h2>
+  <table>
+    <tr><th>Word</th><th>Meaning</th></tr>
+    <tr><td><b>RA, Dec</b></td><td>Right Ascension and Declination: longitude and latitude on the sky, in degrees. RA runs 0–360°, Dec runs −90° (south pole) to +90° (north pole).</td></tr>
+    <tr><td><b>Arcsecond (″), arcminute (′)</b></td><td>Angles on the sky. 1° = 60′ = 3600″. The full Moon is about 30′ wide. One SPHEREx pixel covers 6.15″.</td></tr>
+    <tr><td><b>Exposure</b></td><td>One single photo taken by the telescope.</td></tr>
+    <tr><td><b>Sky pass</b></td><td>One full sweep of the sky, about 6 months. A spot is photographed many times during a pass, over a few days to weeks. So far there are 3–4 passes.</td></tr>
+    <tr><td><b>Detector / band</b></td><td>SPHEREx has 6 detectors, each covering a range of infrared wavelengths (band 1: 0.75–1.09 µm … band 6: 4.42–5.00 µm). µm = micrometre, a millionth of a metre. Visible light is 0.4–0.7 µm.</td></tr>
+    <tr><td><b>Stacking</b></td><td>Averaging many exposures of the same spot. Noise averages away, so faint things become visible.</td></tr>
+    <tr><td><b>Spectrum</b></td><td>How bright an object is at each wavelength. Molecules absorb specific wavelengths, so a spectrum is a chemical fingerprint.</td></tr>
+    <tr><td><b>Proper motion</b></td><td>How fast a star drifts across the sky, in arcseconds per year (″/yr). Most stars: well under 0.1″/yr. Barnard's Star: 10.4″/yr, the fastest known.</td></tr>
+    <tr><td><b>Brown dwarf</b></td><td>A "failed star": too small to burn hydrogen. Cool, faint, glows mostly in the infrared, and its air contains methane and water.</td></tr>
+    <tr><td><b>Gaia</b></td><td>A European space telescope that measured the positions and motions of nearly 2 billion stars. We use it to predict where stars should be.</td></tr>
+    <tr><td><b>mJy (milli-jansky)</b></td><td>A unit of brightness used by astronomers. Bigger = brighter. Only the comparisons matter here.</td></tr>
+    <tr><td><b>Saturated</b></td><td>The star is so bright that the centre pixels "burn out", like an over-exposed photo. Their values are lost.</td></tr>
+  </table>
+
+  <h2 id="start">3. Opening a patch of sky</h2>
+  <ul>
+    <li><b>Guided tour</b> (top right): click one of the five NASA test targets. They are already saved on this computer, so they open in a few seconds. Each comes with a short story of what to look for.</li>
+    <li><b>Sky position box</b>: type a position and press <b>Show</b> (or Enter). Three ways work:
+      <ul>
+        <li>degrees: <code>269.4464 4.7686</code></li>
+        <li>hours/minutes/seconds and degrees: <code>17 57 47.1 +04 46 07</code></li>
+        <li>a name: <code>RW Aur</code>, <code>Vega</code>, <code>M42</code>. The tool looks the name up and moves the catalogue position (which is for the year 2000) forward to 2026 using the object's known motion. The line under the box says what it found.</li>
+      </ul></li>
+    <li><b>Field size</b> (2.4′, 3.6′, 6′, 9′): how much sky is shown. Bigger shows more, which helps for fast movers, but downloads more.</li>
+    <li>The first time you open a new spot, the tool downloads every SPHEREx photo of it from NASA's archive: usually 250–550 photos, 2 to 4 minutes, shown with a progress bar. After that, the spot is saved on this computer and opens instantly.</li>
+  </ul>
+
+  <h2 id="picture">4. Reading the picture</h2>
+  <ul>
+    <li><b>North is up, east is left</b> (as when looking up at the sky). So an object moving <i>west</i> moves to the <i>right</i>.</li>
+    <li>The blue <b>crosshair</b> marks the position you asked for.</li>
+    <li>Top left: the <b>sky pass</b> shown (for example "Mar 2026"), how many photos were stacked, and the wavelength range.</li>
+    <li>Top right: compass and field size.</li>
+    <li>Move the mouse over the picture: the line under it gives the exact RA/Dec, the offset from the centre, the brightness at that pixel, and the nearest Gaia star if any.</li>
+    <li>White blobs are stars and galaxies. Big ones are bright. SPHEREx pictures look soft because its pixels are large (6″); that is normal.</li>
+  </ul>
+
+  <h2 id="flip">5. The flip-book and its controls</h2>
+  <div class="box">
+    <p><b>Why the bands matter (the "fair flip-book").</b> SPHEREx has no ordinary filters. Each detector sits behind a
+      filter whose colour changes across it, so every single photo sees a given star at a slightly different wavelength.
+      If you flipped raw photos, stars would seem to brighten and fade just because the colour changed. So for each
+      detector and each sky pass we <b>stack all the photos</b> (15–25 of them). Every frame in a band then covers the
+      same wavelengths, and only <i>real</i> changes blink.</p>
+  </div>
+  <ul>
+    <li><b>Wavelength band</b> buttons: pick one of the 6 detectors, or <b>All bands</b> (all six averaged: the deepest picture). Cold objects like brown dwarfs show best in the longest bands (3.83–4.41 and 4.42–5.00 µm).</li>
+    <li><b>Sky pass</b> buttons: jump to a pass. The coloured dot next to each pass is the colour used for it in the spectrum plot.</li>
+    <li><b>Play / Pause</b> (or the <kbd>space</kbd> bar) and <b>Prev / Next</b> (or the <kbd>←</kbd> <kbd>→</kbd> keys).</li>
+    <li><b>Blink all passes</b> or <b>Blink first ↔ last</b>: the longest time gap shows motion most clearly.</li>
+    <li><b>Speed</b>: how fast the frames change.</li>
+    <li><b>Brightness</b>: slide right to make faint things brighter (bright stars will burn out); slide left to see detail in bright stars.</li>
+    <li><b>Faint stars</b>: slide right to lift the faint end without burning out the bright stars.</li>
+    <li>If a pass has only a handful of photos in a band, it is too noisy to compare fairly. The tool skips it in the blink and says so in the label.</li>
+  </ul>
+
+  <h2 id="diff">6. Difference views</h2>
+  <p>The dropdown next to the play buttons changes what each frame shows:</p>
+  <ul>
+    <li><b>Normal</b>: the stacked picture.</li>
+    <li><b>Difference (minus average)</b>: each pass minus the average of all passes. Things that did not change disappear.
+      <span class="swatch" style="background:#ff6b5b"></span><b>Red</b> = brighter than usual here,
+      <span class="swatch" style="background:#5b8cff"></span><b>blue</b> = fainter. A star that moved shows up as a
+      <b>red/blue pair</b> (red where it is now, blue where it used to be) that flips as you blink. A star that changed brightness turns all red or all blue. Press <kbd>d</kbd> to toggle.</li>
+    <li><b>Change since first pass</b>: each pass minus the first one.</li>
+    <li><b>All passes added</b>: everything stacked together, the deepest single picture.</li>
+  </ul>
+  <p>Small changes below the noise level are shown as dark grey, so the colours you see are real changes, not noise.</p>
+
+  <h2 id="spectrum">7. Click for a spectrum</h2>
+  <p>Click any object in the picture. The click snaps to the centre of the nearest star. The <b>Spectrum</b> panel
+    on the right then shows:</p>
+  <ul>
+    <li><b>Dots</b>: one per photo. Each is the object's brightness (in a 12″ circle, with the sky around it removed) at the wavelength that photo saw it. Error bars show the uncertainty.</li>
+    <li><b>Lines</b>: one per sky pass, joining the typical (median) value in narrow wavelength steps. <b>If the lines lie on top of each other, the object did not change. If they separate, it did.</b></li>
+    <li>Grey shaded strips mark where molecules absorb: CH₄ (methane, 3.3 µm), ice (water ice, 3.0 µm), CO₂ (4.27 µm), CO (4.67 µm). A dip in one of those strips hints at that molecule.</li>
+    <li>For moving objects, the measurement <b>follows the object</b>: it finds it again in each pass. Coloured dots on the picture show where it was found in each pass, and the panel says how far and which way it moved.</li>
+    <li><b>Log scale</b> button: useful when the brightness spans a big range.</li>
+    <li>You can zoom the plot by dragging a box on it; double-click to zoom back out. Hover over a point for exact values.</li>
+  </ul>
+  <div class="box careful"><p><b>Very bright stars.</b> If the centre of the star is burnt out (saturated) in many
+    photos, the tool switches to measuring the star's <b>outer glow</b> (a ring 18–37″ from the centre, which is not
+    saturated), the same way in every photo, and says so in an orange note. The numbers are then not the star's total
+    brightness, but passes can still be compared fairly.</p></div>
+
+  <h2 id="movers">8. Automatic mover search</h2>
+  <p>Every time you open a spot, the tool searches it by itself (results in the <b>Automatic mover search</b> panel, and
+    arrows on the picture; the <b>Movers</b> button hides/shows the arrows):</p>
+  <ol>
+    <li>It finds every point of light in each pass and measures its position precisely.</li>
+    <li>It links each one to the same object in the other passes.</li>
+    <li>Ordinary stars wobble a little from pass to pass because of measuring noise; that wobble tells the tool how precise this field is. Anything that moved <b>steadily</b> by many times that wobble is flagged.</li>
+    <li>Each flagged object is checked against Gaia:
+      <span style="color:#56d4dd"><b>KNOWN</b></span> = Gaia predicts this motion;
+      <span style="color:#ff7b72"><b>CANDIDATE</b></span> = nothing in Gaia explains it, so it is worth a human look.</li>
+  </ol>
+  <p>The arrow starts at the object's first position and points the way it moved. It is drawn 4 times longer than the
+    real motion so that a few arcseconds are visible. The number is the speed in ″/yr.</p>
+
+  <h2 id="gaia">9. Gaia stars overlay</h2>
+  <p>The <b>Gaia stars</b> button (or <kbd>g</kbd>) draws a circle where the Gaia catalogue predicts each star should be
+    <i>on the date of the pass you are looking at</i>, including its proper motion and the small yearly wobble caused by
+    Earth going around the Sun (parallax).</p>
+  <ul>
+    <li><span style="color:#3fb950">Green circles</span>: ordinary stars (brighter than Gaia magnitude 16.5).</li>
+    <li><span style="color:#ffd33d">Yellow circles</span> with a dashed path and a speed label: fast movers (over 0.2″/yr).</li>
+    <li>When you blink, a fast star should stay inside its moving circle. If something moves and has no circle, Gaia does not know it.</li>
+    <li>The "This position" panel lists how many Gaia stars are in view and the fast ones.</li>
+  </ul>
+
+  <h2 id="lenses">10. Molecule lenses</h2>
+  <p>Open the <b>Molecule lenses</b> tab. Each lens builds a false-colour picture from three wavelength ranges shown as
+    red, green and blue. The colours are balanced so that <b>ordinary stars look white</b>. Anything with a colour has an
+    unusual spectrum. Faint, noisy pixels are kept grey so that colour only appears where there is real signal.</p>
+  <table>
+    <tr><th>Lens</th><th>Red / Green / Blue (µm)</th><th>What stands out</th></tr>
+    <tr><td><b>Infrared colour</b></td><td>3.0–5.0 / 1.6–3.0 / 0.75–1.6</td><td>Cool or dusty objects look orange-red; hot stars bluish-white.</td></tr>
+    <tr><td><b>Methane</b></td><td>4.1–4.65 / 3.2–3.45 / 1.95–2.1</td><td>Green sits on methane's absorption. Methane-rich brown dwarfs lose green and look <b>red/magenta</b>. Glowing dust (3.3 µm emission) looks green.</td></tr>
+    <tr><td><b>Water ice</b></td><td>3.55–3.9 / 2.9–3.15 / 2.2–2.45</td><td>Stars behind icy clouds lose green and look magenta.</td></tr>
+    <tr><td><b>CO₂ / CO</b></td><td>4.55–5.0 / 4.2–4.35 / 3.8–4.05</td><td>Carbon dioxide absorption removes green.</td></tr>
+  </table>
+  <p>The numbers in brackets in the label are how many photos went into each colour. The dropdown under the lens buttons
+    chooses all passes added together (deepest) or a single pass.</p>
+
+  <h2 id="flags">11. Problem flags and the exposure list</h2>
+  <ul>
+    <li>NASA marks every pixel of every photo that may be untrustworthy. The <b>flags</b> dropdown tints those pixels
+      yellow for the pass on screen. The kinds are: saturated (too bright), cosmic ray / transient (a particle hit the detector),
+      ghost / stray light (reflections from bright stars), satellite streak, bad / hot / dead pixel, and persistence
+      (an afterimage of an earlier bright star). The note on the picture says in what fraction of photos the pixel was flagged.
+      Use it to check whether something odd might be an artefact.</li>
+    <li>Under <b>This position</b>, the table lists the sky passes with their dates and number of photos. Open
+      <b>Exposures in the frame on screen</b> to see every photo in the current frame: date and time, detector, and the
+      exact wavelength it saw at this spot.</li>
+  </ul>
+
+  <h2 id="share">12. Sharing and saving</h2>
+  <ul>
+    <li><b>Copy share link</b>: the web address remembers the position, field size, band, view, lens and Gaia setting.
+      Paste it into the address bar later to come back to exactly this view. (For now it only works on this computer,
+      because the website runs here.)</li>
+    <li><b>Save picture</b>: saves what is on screen as a PNG image (into your Downloads folder).</li>
+    <li><b>Save animation (GIF)</b>: saves the blink as an animated GIF with labels, ready for slides.</li>
+  </ul>
+
+  <h2 id="tour">13. The five test targets: what to try</h2>
+
+  <h3>Barnard's Star: the fastest star in the sky</h3>
+  <div class="box try"><ul>
+    <li>Band 1.63–2.41 µm, press Play: the big bright star hops <b>upward (north)</b> between passes.</li>
+    <li>Turn on <b>Gaia stars</b>: it stays inside its yellow circle, which moves 10.4″/yr.</li>
+    <li>Choose <b>Difference</b>: a red/blue pair that flips.</li>
+    <li>The mover search finds it: <b>KNOWN, about 10.3″/yr</b>, matching Gaia.</li>
+    <li>Its centre is saturated, so its spectrum uses the outer glow (orange note).</li>
+  </ul></div>
+
+  <h3>Epsilon Indi B: a pair of brown dwarfs</h3>
+  <div class="box try"><ul>
+    <li>Band 4.42–5.00 µm, <b>Difference</b>: a clear red/blue pair moving <b>south-east</b> (down-left), about 4.7″/yr. Four sky passes are available here.</li>
+    <li>Click it: the spectrum dips at 3.3 µm (methane) and peaks near 4 µm, the brown-dwarf fingerprint. The four pass curves agree.</li>
+    <li>The mover search: <b>KNOWN</b> (Gaia predicts it).</li>
+  </ul></div>
+
+  <h3>WISE 0855: the coldest known brown dwarf</h3>
+  <div class="box try"><ul>
+    <li>Molecule lenses → <b>Methane</b>: it is <b>the one red dot</b> at the centre; every other star is white.</li>
+    <li>Flip-book, band 4.42–5.00 µm: a faint dot at the centre. In <b>Difference</b> it is a blue/red pair moving <b>west (right)</b>, about 8″/yr.</li>
+    <li>The mover search flags it as a <b>CANDIDATE: no Gaia star predicts this motion</b>. It is too faint for Gaia, so the tool found it with no hint. This is exactly how a new object would be discovered.</li>
+    <li>It is passing a faint background star right now, so its spectrum shows both: the star's light at short wavelengths and the brown dwarf's bump at 4–5 µm.</li>
+    <li>Note: the coordinates printed in the challenge text are from about 2014. By 2026 it has moved about 1.6′ west, so the tour uses its present position.</li>
+  </ul></div>
+
+  <h3>RW Aurigae: a young star with a dusty disk</h3>
+  <div class="box try"><ul>
+    <li>Click the star. It is too bright for the centre pixels, so the outer glow is measured.</li>
+    <li>Between Sep 2025 and Sep 2026 its glow at <b>3–5 µm faded to about half</b> (the wavelengths of warm dust in its disk), while short wavelengths changed much less.</li>
+    <li>The mover search finds nothing moving: correct, it is a variable star, not a fast mover.</li>
+  </ul></div>
+
+  <h3>R Draconis: a pulsating red giant</h3>
+  <div class="box try"><ul>
+    <li>Click the star. The <b>June 2025</b> curve is clearly <b>brighter</b> than November 2025 and June 2026 across most of the spectrum. It swells and shrinks every 8 months or so.</li>
+    <li>The wavy shape of the spectrum comes from water vapour in the giant's cool outer layers.</li>
+    <li>It is extremely bright (centre burnt out over ~25 pixels), so treat the exact numbers as rough.</li>
+  </ul></div>
+
+  <h2 id="limits">14. Honest limits</h2>
+  <ul>
+    <li><b>Saturated stars</b> (Barnard's Star, RW Aur, R Dra): pictures and motion are fine; spectra use the outer glow and are approximate. On Barnard's Star, which should not change, passes agree to about 5–10% at most wavelengths (up to ~25% at the shortest), because the telescope's star shape differs slightly by season. Changes much bigger than that are real.</li>
+    <li><b>Only 3–4 sky passes exist so far</b>, so very slow movers (under ~1″/yr) are hard to see.</li>
+    <li><b>Asteroids and comets</b> move far faster than stars (they are gone between passes). This tool targets slow movers like nearby stars and brown dwarfs.</li>
+    <li><b>Spectrum brightness</b> is measured in a 12″ circle: right for comparing passes and wavelengths, not a calibrated total brightness.</li>
+    <li><b>Lenses</b> combine all passes, so a fast mover is slightly smeared.</li>
+    <li>If NASA's archive is busy, a new position can fail. Just press Show again.</li>
+  </ul>
+
+  <h2 id="how">15. How it works behind the scenes</h2>
+  <ol>
+    <li><b>Find</b>: asks NASA's IRSA archive which SPHEREx photos cover the position (about 1 second).</li>
+    <li><b>Download</b>: fetches a small cut-out around the position from each photo. Only the picture layers are downloaded (about 130 KB each instead of 4 MB), so a whole target is about 45 MB.</li>
+    <li><b>Clean</b>: removes pixels NASA flagged as bad and the glow of sunlight scattered by dust in the solar system (zodiacal light).</li>
+    <li><b>Group</b>: sorts photos into sky passes (a new pass starts after a gap of more than 60 days).</li>
+    <li><b>Align and stack</b>: redraws every photo on a common north-up grid, then averages all photos of one detector in one pass, throwing out one-off blemishes such as cosmic rays.</li>
+    <li><b>On demand</b>: spectra, lenses, flags, Gaia predictions and the mover search are computed from the saved photos when you ask.</li>
+  </ol>
+  <p class="muted small-note">Data: NASA/IPAC IRSA SPHEREx archive (data release 1 and quick release), ESA Gaia DR3, CDS Sesame
+    name service. New SPHEREx data releases are picked up by adding their name in one place in the code.</p>
+  <a class="back" href="/">← Back to the flip-book</a>
+</div>
+</body>
+</html>

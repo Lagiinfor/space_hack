@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPHEREx Sky Flip-book</title>
+<link rel="stylesheet" href="style.css?v=3">
+<script src="vendor/plotly.min.js" defer></script>
+<script src="app.js?v=3" defer></script>
+</head>
+<body>
+<header class="row spread" style="align-items:flex-start;gap:16px">
+  <div>
+    <h1>SPHEREx Sky Flip-book</h1>
+    <p>Every pixel is a spectrum, every spectrum has a history. Type a sky position: the tool gathers every
+       SPHEREx image of that spot, stacks them fairly per ~6-month sky pass, and blinks the passes so anything that
+       moved or changed stands out. Click any object to see its infrared spectrum in each pass.</p>
+  </div>
+  <a href="guide.html" class="guide-btn">📖 Guide</a>
+</header>
+
+<main>
+  <!-- ======================= left: the viewer ======================= -->
+  <section class="panel viewer-panel">
+    <label class="small" for="where">Sky position: RA Dec in degrees, hours/degrees, or a name</label>
+    <div class="row wrap">
+      <input type="text" id="where" placeholder="e.g. 269.4464 4.7686   ·   17 57 47.1 +04 46 07   ·   RW Aur">
+      <select id="field" title="Field of view: bigger shows more sky but takes longer to download">
+        <option value="0.04">2.4′ field</option>
+        <option value="0.06" selected>3.6′ field</option>
+        <option value="0.1">6′ field</option>
+        <option value="0.15">9′ field</option>
+      </select>
+      <button class="primary" id="go">Show</button>
+    </div>
+    <div class="resolved muted" id="resolved"></div>
+    <div class="progress" id="progress">
+      <div class="bar"><div id="barfill"></div></div>
+      <div class="stage" id="stage"></div>
+    </div>
+    <div class="error" id="error"></div>
+
+    <div id="player" class="hidden">
+      <div class="tabs" role="tablist">
+        <button id="tab-flip" class="tab on">Flip-book</button>
+        <button id="tab-lens" class="tab">Molecule lenses</button>
+      </div>
+
+      <div class="viewer">
+        <canvas id="sky" width="720" height="720"></canvas>
+        <div class="overlay-label" id="olabel"></div>
+        <div class="overlay-sub" id="osub"></div>
+        <div class="compass">N ↑<br>← E<br><span id="scale"></span></div>
+        <div class="legend hidden" id="legend"></div>
+      </div>
+      <div class="hover" id="hover">Move the mouse over the picture to read positions. Click an object for its spectrum.</div>
+
+      <!-- flip-book controls -->
+      <div id="flip-controls" class="controls">
+        <div class="ctl-label">Wavelength band</div>
+        <div class="row wrap" id="bands"></div>
+        <div class="ctl-label">Sky pass</div>
+        <div class="row wrap" id="passes"></div>
+        <div class="row wrap">
+          <button id="play" title="Space bar">Pause</button>
+          <button id="prev" title="Left arrow">◀ Prev</button>
+          <button id="next" title="Right arrow">Next ▶</button>
+          <select id="view" title="What each frame shows">
+            <option value="normal">Normal</option>
+            <option value="diff">Difference (minus average)</option>
+            <option value="first">Change since first pass</option>
+            <option value="stack">All passes added</option>
+          </select>
+          <select id="blinkset" title="Which passes to blink">
+            <option value="all">Blink all passes</option>
+            <option value="ends">Blink first ↔ last</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- lens controls -->
+      <div id="lens-controls" class="controls hidden">
+        <div class="row wrap" id="lenslist"></div>
+        <div class="row wrap">
+          <select id="lenspass"></select>
+        </div>
+        <p class="lens-explain" id="lensexplain"></p>
+      </div>
+
+      <div class="controls">
+        <div class="ctl-label">Overlays</div>
+        <div class="row wrap">
+          <button id="cross" class="on">Crosshair</button>
+          <button id="moversBtn" class="on" title="Arrows on everything the automatic search found moving between passes">Movers</button>
+          <button id="gaiaBtn" title="Stars from ESA's Gaia catalogue, at the position Gaia predicts for this pass">Gaia stars</button>
+          <select id="flagsel" title="Show where the archive flagged problems in this pass">
+            <option value="">No problem flags</option>
+          </select>
+        </div>
+        <div class="row slider"><span>Speed</span><input type="range" id="speed" min="150" max="2000" step="50" value="700"></div>
+        <div class="row slider"><span>Brightness</span><input type="range" id="bright" min="0" max="100" value="35"></div>
+        <div class="row slider"><span>Faint stars</span><input type="range" id="soft" min="0" max="100" value="40"></div>
+        <div class="row wrap" style="margin-top:12px">
+          <button id="share">Copy share link</button>
+          <button id="savepng">Save picture</button>
+          <button id="savegif" title="Animated GIF of the blink, with the labels">Save animation (GIF)</button>
+          <span class="muted" id="sharemsg"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= right: tour, spectrum, info ======================= -->
+  <section class="side">
+    <div class="panel" id="tourpanel">
+      <h2>Guided tour: the five NASA test targets</h2>
+      <div id="tour" class="tour"></div>
+      <p class="tourstory hidden" id="tourstory"></p>
+    </div>
+
+    <div class="panel hidden" id="moverpanel">
+      <h2>Automatic mover search</h2>
+      <div id="moverlist" class="muted"></div>
+      <p class="muted small-note">The tool finds every point of light in each pass, links them across passes, and flags
+        anything that shifted steadily by much more than ordinary stars wobble in this field. Each mover is then checked
+        against Gaia: <b>known</b> means Gaia predicts that motion; <b>candidate</b> means nothing in Gaia explains it,
+        so it is worth a human look. Search engine shared with the team's analysis package.</p>
+    </div>
+
+    <div class="panel hidden" id="specpanel">
+      <div class="row spread">
+        <h2>Spectrum</h2>
+        <div class="row">
+          <button id="logy" class="small-btn">Log scale</button>
+          <button id="specclose" class="small-btn">Close</button>
+        </div>
+      </div>
+      <div class="muted" id="specinfo"></div>
+      <div id="specplot"></div>
+      <div class="warn hidden" id="specwarn"></div>
+      <p class="muted small-note">Each dot is one SPHEREx exposure: the object's brightness (light within 12″, sky
+        around it removed) at the wavelength that exposure saw it. Lines join the median in narrow wavelength steps,
+        one line per sky pass. If the lines differ, the object changed.</p>
+    </div>
+
+    <div class="panel hidden" id="info">
+      <h2>This position</h2>
+      <p id="summary" class="muted"></p>
+      <table id="ptable"></table>
+      <div id="gaiainfo" class="muted small-note"></div>
+      <details id="expdetails">
+        <summary class="muted small-note">Exposures in the frame on screen</summary>
+        <div id="explist" class="explist"></div>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h2>How to read it</h2>
+      <ul>
+        <li><b>Each frame is one sky pass.</b> SPHEREx sweeps the whole sky about every six months.</li>
+        <li><b>Why bands?</b> SPHEREx has no ordinary filters: the colour it sees changes across each of its 6
+          detectors, so each single photo sees a star at a different wavelength. We stack <i>all</i> photos from one
+          detector in one pass, so every frame in a band covers the same wavelengths. Only real changes blink.</li>
+        <li><b>Movers</b> jump between frames. Barnard's Star moves about 10″ a year, under 2 SPHEREx pixels.</li>
+        <li><b>Difference</b>: each pass minus the average of all passes. Red = brighter than usual, blue = fainter.
+          A mover shows as a red/blue pair that flips.</li>
+        <li><b>Gaia stars</b>: circles show where ESA's Gaia catalogue says each star should be on that date. A star
+          that moves <i>with</i> its circle is understood. Something that moves with no circle is worth a closer look.</li>
+        <li><b>Molecule lenses</b> recolour the sky using wavelengths where molecules absorb. Ordinary stars come out
+          white, so anything coloured has unusual chemistry.</li>
+      </ul>
+      <p class="muted small-note">Data: NASA/IPAC IRSA SPHEREx archive (DR1 + quick release), ESA Gaia DR3, CDS Sesame.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

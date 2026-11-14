@@ -1,0 +1,14 @@
+# Python's private copy of its add-ons: each computer makes its own (start.bat does it)
+.venv/
+__pycache__/
+*.pyc
+
+# Single SPHEREx photos (about 45 MB per position). The app downloads them again
+# automatically when needed; the small stacked results next to them are kept.
+data/*/cutouts_*/
+data/**/*.part
+data/**/*_partial.json
+
+# Odds and ends
+.DS_Store
+Thumbs.db
