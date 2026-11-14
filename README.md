@@ -20,6 +20,9 @@ The five tour targets open straight away: their stacked pictures are included. T
 you open a tour target, the tool fetches them from NASA in the background (2 to 4 minutes per target). Clicking for a
 spectrum during that time just waits until they are in.
 
+To fetch them all up front instead, double-click **download_photos.bat** (about 4 to 15 minutes; safe to run again,
+it skips photos you already have). Any new sky position you type in the app is downloaded from NASA automatically.
+
 ## How to start it (every time)
 
 1. Open the `spherex-sky-tool` folder.
@@ -78,6 +81,7 @@ Parameters: `ra`, `dec` (degrees), `field` (degrees: 0.04, 0.06, 0.1, 0.15), `ba
 
 | File | Job |
 |---|---|
+| `download_photos.bat`, `scripts/download_photos.py` | Download all NASA photos for the tour targets (or any position) ahead of time. |
 | `start.bat`, `scripts/launch.py` | One-click start: sets up Python packages on first run, waits until the tool is ready, then opens the browser. |
 | `server/app.py` | The small local web server the page talks to. |
 | `web/index.html`, `web/app.js`, `web/style.css` | The page: search, player, lenses, spectrum plot, overlays. `web/vendor/plotly.min.js` draws the spectrum plot (stored locally so it works offline). |
