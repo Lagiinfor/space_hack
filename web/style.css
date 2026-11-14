@@ -214,3 +214,6 @@ summary { cursor: pointer; }
   .overlay-label { font-size: 18px; } .overlay-sub { font-size: 11px; top: 34px; }
   .where-now { margin-left: 0; width: 100%; }
 }
+.no3d { position: absolute; right: 30px; top: 40%; max-width: 380px; color: #c6d1ea; background: var(--panel); border: 1px solid var(--line2);
+  border-radius: 14px; padding: 16px; font-size: 14px; }
+#globebtn { cursor: pointer; }

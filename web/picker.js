@@ -6,12 +6,22 @@ const fmt = (ra, dec) => `RA ${ra.toFixed(3)}°, Dec ${dec >= 0 ? "+" : ""}${dec
 let current = null;   // what the pick card is showing
 let tour = [];
 
-const sky = new SkyPicker($("globe"), {
+let sky;
+try {
+sky = new SkyPicker($("globe"), {
   onPick: ({ ra, dec, target, constellation }) => showCard(ra, dec, target, constellation),
   onHover: (p) => {
     $("skyhover").textContent = p ? `${fmt(p.ra, p.dec)}${p.constellation ? " · near " + p.constellation : ""} · click to choose` : "";
   },
 });
+} catch (err) {
+  // no 3D graphics available in this browser: say so, keep the list and the search box working
+  console.error(err);
+  $("globe").innerHTML = '<div class="no3d">The 3D sky needs graphics acceleration (WebGL), which this browser has turned off. ' +
+    'You can still pick a famous place from the list or type a name. Try Chrome or Edge for the full experience.</div>';
+  sky = { select: (ra, dec, t) => { showCard(ra, dec, t, ""); }, setTargets() {}, reset() {}, flyTo: async () => {},
+    constellationOf: () => "", reticle: {} };
+}
 window.skyPicker = sky;
 
 function showCard(ra, dec, target, constellation) {

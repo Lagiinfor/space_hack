@@ -760,6 +760,7 @@ async function startTour(t) {
 function wire() {
   $("go").onclick = () => { S.tourKey = null; go(); };
   $("backtosky").onclick = backToSky;
+  $("globebtn").onclick = backToSky;
   $("step1").onclick = backToSky;
   $("step2").onclick = () => { if (S.R) setMode("flip"); };
   $("step3").onclick = () => {

@@ -21,6 +21,16 @@ from spx import analysis, flipbook, resolve  # noqa: E402
 from spx.tour import TOUR  # noqa: E402
 
 app = FastAPI(title="SPHEREx sky flip-book")
+
+
+@app.middleware("http")
+async def no_stale_pages(request, call_next):
+    """Make the browser always fetch the newest version of the page and its scripts,
+    so improvements show up on a normal refresh."""
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.endswith((".html", ".js", ".css")):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 JOBS: dict[str, dict] = {}
 ONE_AT_A_TIME = threading.Lock()  # be polite to the archive: one position at a time
 
