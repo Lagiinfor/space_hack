@@ -22,11 +22,16 @@ def is_up() -> bool:
         return False
 
 
+def open_page():
+    # a fresh address each time, so the browser can't show an old saved copy of the page
+    webbrowser.open(f"{URL}?t={int(time.time())}")
+
+
 def open_when_ready():
     for _ in range(120):  # up to 60 seconds
         if is_up():
             print("\n  Ready! Opening", URL, "in your browser.\n  Keep this window open while you use the tool; close it to stop.\n")
-            webbrowser.open(URL)
+            open_page()
             return
         time.sleep(0.5)
     print("\n  The tool did not start within a minute. Please send a screenshot of this window.\n")
@@ -36,7 +41,7 @@ if __name__ == "__main__":
     if is_up():
         print("\n  The tool is already running. Opening", URL, "in your browser.")
         print("  (It keeps running in the other black window. Close that window to stop it.)\n")
-        webbrowser.open(URL)
+        open_page()
         time.sleep(3)
         sys.exit(3)
     print("\n  Starting the SPHEREx Sky Flip-book... (this takes a few seconds)\n")
