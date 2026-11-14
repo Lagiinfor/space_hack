@@ -155,7 +155,7 @@ def coadd(cutouts: list[Cutout], grid_wcs: WCS, shape, clip: float = 4.0):
     return mean, np.isfinite(cube).sum(axis=0)
 
 
-def fill_saturated_cores(img: np.ndarray, max_area: int = 80, rounds: int = 6):
+def fill_saturated_cores(img: np.ndarray, max_area: int = 600, rounds: int = 30):
     """Fill ONLY small holes that are completely surrounded by measured pixels: in
     practice the burnt-out centre of a very bright star, which the archive stores as
     'no value'. They are painted as bright as their brightest neighbour so the star

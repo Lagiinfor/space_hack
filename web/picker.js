@@ -38,7 +38,7 @@ function showCard(ra, dec, target, constellation) {
     : "First visit to a new spot: the tool fetches every SPHEREx photo of it from NASA (2 to 4 minutes).";
   $("pickcard").classList.remove("hidden");
   document.body.classList.add("has-card");
-  for (const b of $("tour").children) b.classList.toggle("on", isTour && b.dataset.key === target.key);
+  for (const b of [...$("tour").children, ...$("tour2").children]) b.classList.toggle("on", isTour && b.dataset.key === target.key);
 }
 
 $("pcclose").onclick = () => {
@@ -63,14 +63,16 @@ window.addEventListener("tour-loaded", (e) => {
   tour = e.detail || [];
   sky.setTargets(tour);
   $("tour").innerHTML = "";
+  $("tour2").innerHTML = "";
   for (const t of tour) {
     const b = document.createElement("button");
     b.className = "tour-btn";
     b.dataset.key = t.key;
     b.innerHTML = `<b>${t.name}</b><span>${t.kind}</span>`;
     b.onclick = () => { if (t.ra !== undefined) sky.select(t.ra, t.dec, t); };
-    $("tour").appendChild(b);
+    (t.group === "extra" ? $("tour2") : $("tour")).appendChild(b);
   }
+  $("tour2wrap").classList.toggle("hidden", !$("tour2").children.length);
 });
 // app.js may have loaded the tour before this module ran
 if (typeof S !== "undefined" && S.tour && S.tour.length) window.dispatchEvent(new CustomEvent("tour-loaded", { detail: S.tour }));

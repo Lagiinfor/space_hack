@@ -130,23 +130,66 @@ async function load(ra, dec, field, keepBand) {
   $("error").textContent = "";
   const token = (S.loadToken = (S.loadToken || 0) + 1);   // a newer click makes this one step aside
   const { job } = await api(`/api/flipbook?ra=${ra}&dec=${dec}&field=${field}&client=${TAB_ID}`, { method: "POST" });
+  let shownPreview = 0;
+  S.R = null;
   while (true) {
     if (token !== S.loadToken) return;
     const st = await api(`/api/job/${job}`);
     if (token !== S.loadToken || st.state === "cancelled") return;
-    showProgress(st.stage, st.frac);
     if (st.state === "error") return fail(st.stage);
     if (st.state === "done") break;
+    if (st.preview_n && st.preview_n !== shownPreview) {
+      // a fair first look from the photos that have arrived; it sharpens as more come in
+      try {
+        const P = await api(`/api/job/${job}/preview`);
+        if (token !== S.loadToken) return;
+        shownPreview = st.preview_n;
+        showResult(P, keepBand, !!S.R);
+      } catch { /* the next poll will try again */ }
+    }
+    if (S.R) showSharpening(st.stage, st.frac);
+    else showProgress(st.stage, st.frac);
     await new Promise((res) => setTimeout(res, 700));
   }
-  showProgress("Unpacking pictures...", 1);
+  if (!S.R) showProgress("Unpacking pictures...", 1);
   const R = await api(`/api/job/${job}/result`);
   if (token !== S.loadToken) return;
+  showResult(R, keepBand, !!S.R);
+}
+
+// show a (preview or final) result; if one is already on screen, swap the pictures in
+// place and keep the person's choices (band, view, frame)
+function showResult(R, keepBand, swapping) {
   for (const f of R.frames) f.arr = unpack(f.pixels);
+  hideProgress();
+  $("sharpen").classList.toggle("hidden", !R.preview);
+  if (swapping && S.R && S.R.ra === R.ra && S.R.dec === R.dec) {
+    const keepIdx = S.frameIdx;
+    S.R = R;
+    S.flags = null; S.lensData = null;
+    if (!R.frames.some((f) => f.band === S.band)) S.band = 0;
+    S.frameIdx = Math.min(keepIdx, Math.max(0, blinkFrames().length - 1));
+    fillPatchInfo();
+    if (!R.preview) afterFinal();
+    refresh();
+    return;
+  }
   S.R = R;
   S.gaia = null; S.flags = null; S.lensData = null; S.click = null; S.spec = null; S.movers = null;
-  hideProgress();
   setup(keepBand);
+}
+
+function showSharpening(stage, frac) {
+  const el = $("sharpen");
+  el.classList.remove("hidden");
+  el.innerHTML = `<b>First look</b> from ${S.R.n_used} of ${S.R.n_images} photos · still downloading, the pictures will sharpen` +
+    `<div class="mini-bar"><div style="width:${Math.round(frac * 100)}%"></div></div>`;
+}
+
+// things that need every photo: run them once the final result is in
+function afterFinal() {
+  if (S.showGaia) loadGaia();
+  loadMovers();
 }
 
 // ------------------------------------------------------------------ building the player
@@ -174,6 +217,20 @@ function setup(keepBand) {
   }
   $("lenspass").innerHTML = `<option value="all">All passes added (deepest)</option>` +
     R.passes.map((p) => `<option value="${p.index}">${p.label} only</option>`).join("");
+  fillPatchInfo();
+  if (params.get("mode") === "lens" && !keepBand && !R.preview) S.mode = "lens";
+  if (params.get("gaia") === "1" && !keepBand) S.showGaia = true;
+  if (R.preview) {
+    S.mode = "flip";
+    $("moverpanel").classList.remove("hidden");
+    $("moverlist").textContent = "The automatic search for moving objects runs as soon as all photos are in.";
+  } else afterFinal();
+  if (S.mode === "lens") setMode("lens"); else setMode("flip");
+  play(true);
+}
+
+function fillPatchInfo() {
+  const R = S.R;
   $("scale").textContent = `${(R.field_deg * 60).toFixed(1)}′ across`;
   const cname = window.skyPicker ? window.skyPicker.constellationOf(R.ra, R.dec) : "";
   $("wherenow").textContent = `RA ${R.ra.toFixed(4)}°, Dec ${R.dec >= 0 ? "+" : ""}${R.dec.toFixed(4)}°` + (cname ? ` · in ${cname}` : "");
@@ -187,14 +244,9 @@ function setup(keepBand) {
   for (const p of R.passes) t += `<tr><td><span style="color:${PASS_COLORS[p.index % 6]}">●</span> ${p.label}</td>` +
     `<td>${p.start} to ${p.end}</td><td>${p.n}</td></tr>`;
   $("ptable").innerHTML = t;
+  if (R.preview) $("summary").textContent = `First look: ${R.n_used} of ${R.n_images} photos downloaded so far. ` +
+    "The picture sharpens as the rest arrive; spectra, chemistry filters and the mover search open when all are in.";
   $("gaiainfo").textContent = "";
-
-  if (params.get("mode") === "lens" && !keepBand) S.mode = "lens";
-  if (params.get("gaia") === "1" && !keepBand) S.showGaia = true;
-  if (S.showGaia) loadGaia();
-  loadMovers();
-  if (S.mode === "lens") setMode("lens"); else setMode("flip");
-  play(true);
 }
 
 function framesForBand() {
@@ -510,6 +562,10 @@ function play(on) {
 
 // ------------------------------------------------------------------ modes, lenses, overlays
 function setMode(m) {
+  if (m === "lens" && S.R && S.R.preview) {
+    $("hover").textContent = "Chemistry filters open as soon as all photos are downloaded.";
+    m = "flip";
+  }
   S.mode = m;
   if (m === "lens") { S.lensData = null; }
   refresh();
@@ -643,6 +699,7 @@ function snapToStar(cx, cy) {
 
 async function clickSpectrum(e) {
   if (!S.R) return;
+  if (S.R.preview) { $("hover").textContent = "Spectra open as soon as all photos are downloaded (see the bar at the top of the picture)."; return; }
   const r = e.target.getBoundingClientRect();
   const n = S.R.size;
   let cx = (e.clientX - r.left) / r.width * n, cy = (e.clientY - r.top) / r.height * n;

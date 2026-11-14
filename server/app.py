@@ -5,6 +5,7 @@ then open http://localhost:8000 in a browser.
 """
 from __future__ import annotations
 
+import json
 import sys
 import threading
 import traceback
@@ -89,7 +90,12 @@ def start(ra: float, dec: float, field: float = 0.06, client: str = "local"):
                 return
             job["state"] = "running"
             try:
-                flipbook.build(ra, dec, field, progress=lambda s, f: job.update(stage=s, frac=f), stop=stop)
+                def on_preview(pre):
+                    job["preview"] = json.dumps(pre)
+                    job["preview_n"] = pre["n_used"]
+                flipbook.build(ra, dec, field, progress=lambda s, f: job.update(stage=s, frac=f), stop=stop,
+                               on_preview=on_preview)
+                job.pop("preview", None)
                 job.update(state="done", stage="Done", frac=1.0)
                 analysis._cache.pop((round(ra, 4), round(dec, 4), field), None)   # forget older copy
                 warm(ra, dec, field)
@@ -108,7 +114,16 @@ def status(job_id: str):
     job = JOBS.get(job_id)
     if not job:
         raise HTTPException(404, "Unknown request")
-    return {k: v for k, v in job.items() if k != "args"}
+    return {k: v for k, v in job.items() if k not in ("args", "preview")}
+
+
+@app.get("/api/job/{job_id}/preview")
+def preview(job_id: str):
+    """A first look made from the photos downloaded so far (fairly stacked)."""
+    job = JOBS.get(job_id)
+    if not job or "preview" not in job:
+        raise HTTPException(404, "No preview yet")
+    return Response(job["preview"], media_type="application/json")
 
 
 @app.get("/api/job/{job_id}/result")

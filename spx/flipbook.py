@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
 import warnings
 from pathlib import Path
 
@@ -53,14 +54,15 @@ def _pack(a: np.ndarray) -> str:
     'No data' pixels stay NaN, so the page can show them as no data, not as black sky."""
     return base64.b64encode(np.asarray(a, dtype="<f4").tobytes()).decode()
 
-RESULT_VERSION = 6   # bump when the way frames are made changes; older saved results are rebuilt
+RESULT_VERSION = 7   # bump when the way frames are made changes; older saved results are rebuilt
 
 
 class Cancelled(Exception):
     """The person asked for another patch before this one finished."""
 
 
-def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage, frac: None, stop=None) -> dict:
+def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage, frac: None, stop=None,
+          on_preview=None) -> dict:
     ra, dec = round(ra, 4), round(dec, 4)
     out = result_path(ra, dec, field_deg)
     if out.exists():
@@ -76,22 +78,108 @@ def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage,
     if not images:
         raise ValueError("SPHEREx has no images of this position yet.")
 
-    progress(f"Downloading {len(images)} image cutouts", 0.05)
-    got = archive.fetch_all(images, ra, dec, cut_deg, pdir / f"cutouts_{cut_deg}",
-                            progress=lambda d, n: progress(f"Downloading image cutouts ({d} of {n})",
-                                                           0.05 + 0.75 * d / n), stop=stop)
+    # Download in a balanced order (every sky pass and detector early on, spread out in
+    # time), so that after the first few dozen photos a fair preview can already be made.
+    images = priority_order(images)
+    n_img = len(images)
+    done_paths, lock = [], threading.Lock()
+
+    def on_done(im, path):
+        with lock:
+            done_paths.append(path)
+
+    fetch_result = {}
+
+    def fetch():
+        fetch_result["got"] = archive.fetch_all(
+            images, ra, dec, cut_deg, pdir / f"cutouts_{cut_deg}", stop=stop, on_done=on_done,
+            progress=lambda d, n: progress(f"Downloading photos from NASA ({d} of {n})", 0.05 + 0.75 * d / n))
+
+    worker = threading.Thread(target=fetch, daemon=True)
+    worker.start()
+    loaded: dict = {}
+
+    def load_new(paths):
+        for p in paths:
+            if p not in loaded:
+                try:
+                    loaded[p] = frames.load_cutout(p, ra, dec)
+                except Exception as e:  # a damaged file should not sink the whole request
+                    print(f"  could not read {p.name}: {e}")
+                    loaded[p] = None
+
+    # previews after about 15%, 40% and 70% of the photos (at least 40 photos)
+    checkpoints = [max(40, int(f * n_img)) for f in (0.15, 0.4, 0.7)]
+    while worker.is_alive():
+        worker.join(timeout=0.5)
+        if stop and stop():
+            break
+        with lock:
+            have = list(done_paths)
+        if on_preview and checkpoints and len(have) >= checkpoints[0] and len(have) < n_img:
+            while checkpoints and len(have) >= checkpoints[0]:
+                checkpoints.pop(0)
+            load_new(have)
+            cuts = [loaded[p] for p in have if loaded[p] is not None]
+            try:
+                pre = make_result(cuts, images, ra, dec, field_deg, pdir, preview=True)
+                on_preview(pre)
+            except Exception as e:  # a preview is a bonus; never let it break the real build
+                print("  preview skipped:", e)
     if stop and stop():
         raise Cancelled()
+    got = fetch_result.get("got", [])
 
     progress("Cleaning up the images", 0.82)
-    cuts = []
-    for _, p in got:
-        try:
-            cuts.append(frames.load_cutout(p, ra, dec))
-        except Exception as e:  # a damaged file should not sink the whole request
-            print(f"  could not read {p.name}: {e}")
+    load_new([p for _, p in got])
+    cuts = [loaded[p] for _, p in got if loaded.get(p) is not None]
     if not cuts:
         raise ValueError("None of the images could be downloaded. Try again in a minute.")
+    result = make_result(cuts, images, ra, dec, field_deg, pdir, progress=progress)
+    out_tmp = out if result["complete"] else out.with_name(out.stem + "_partial.json")
+    out_tmp.write_text(json.dumps(result))
+    progress("Done", 1.0)
+    return result
+
+
+def priority_order(images: list[dict]) -> list[dict]:
+    """Interleave photos so any early part of the list samples every sky pass and every
+    detector, spread over the dates within each pass."""
+    if not images:
+        return images
+    guess = frames.assign_passes([im["mjd"] for im in images])
+    groups: dict = {}
+    for im, k in zip(images, guess):
+        groups.setdefault((int(k), im["detector"]), []).append(im)
+
+    def spread(lst):
+        lst = sorted(lst, key=lambda im: im["mjd"])
+        n = len(lst)
+        def vdc(i):  # van der Corput: 0, 1/2, 1/4, 3/4, ... spreads picks evenly
+            x, f = 0.0, 0.5
+            while i:
+                x += f * (i & 1); i >>= 1; f /= 2
+            return x
+        return [lst[min(n - 1, int(vdc(i) * n))] for i in range(n)] if n else []
+
+    queues = []
+    for key in sorted(groups):
+        seen, q = set(), []
+        for im in spread(groups[key]) + sorted(groups[key], key=lambda im: im["mjd"]):
+            ident = (im["obs_id"], im["detector"])
+            if ident not in seen:
+                seen.add(ident); q.append(im)
+        queues.append(q)
+    out = []
+    while any(queues):
+        for q in queues:
+            if q:
+                out.append(q.pop(0))
+    return out
+
+
+def make_result(cuts, images, ra, dec, field_deg, pdir, preview=False, progress=lambda s, f: None) -> dict:
+    """Turn the photos we have into the flip-book package (fair stacking etc.)."""
     passes = frames.assign_passes([c.mjd for c in cuts])
     n_pass = int(passes.max()) + 1
 
@@ -177,10 +265,8 @@ def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage,
         version=RESULT_VERSION,
         built=Time.now().strftime("%Y-%m-%d"),
         collections=archive.COLLECTIONS,
+        preview=preview,
     )
-    # if part of the archive was down, show what we have but don't keep it, so the
-    # next visit tries again for the full set
-    out_tmp = out if result["complete"] else out.with_name(out.stem + "_partial.json")
-    out_tmp.write_text(json.dumps(result))
-    progress("Done", 1.0)
+    if preview:
+        result["complete"] = False
     return result
