@@ -552,9 +552,17 @@ function drawOverlays(ctx, s) {
   if (S.showGaia && S.gaia) {
     const cf = S.mode === "flip" && S.view !== "stack" ? currentFrame() : null;
     const passIdx = cf && !cf.other ? cf.pass_index : null;
+    // the Gaia star (if any) inside the measuring circle of the clicked spot: it gets a
+    // bold ring outside the red click ring, with its brightness written next to it
+    let chosen = null, chosenD = 7;
+    if (S.click) for (const st of S.gaia.stars) {
+      const t = cf && cf.other ? gaiaAt(st, cf.mjd) : st.track[passIdx ?? Math.floor(st.track.length / 2)];
+      const d = Math.hypot(t[0] - S.click.east, t[1] - S.click.north);
+      if (d < chosenD) { chosenD = d; chosen = st; }
+    }
     for (const st of S.gaia.stars) {
       const fast = st.pm > 200;
-      const faint = !fast && st.g > GAIA_GMAX;   // fainter Gaia stars: smaller, dimmer circles so the view stays clear
+      const faint = !fast && st.g > GAIA_GMAX;   // fainter Gaia stars: dashed rings, so bright and faint can be told apart
       // track through all passes for fast movers
       if (fast) {
         ctx.strokeStyle = "#ffd33d99"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
@@ -564,10 +572,28 @@ function drawOverlays(ctx, s) {
       }
       const t = cf && cf.other ? gaiaAt(st, cf.mjd) : st.track[passIdx ?? Math.floor(st.track.length / 2)];
       const [x, y] = skyToCanvas(t[0], t[1]);
-      const r = (faint ? 4 : Math.max(6, 16 - st.g * 0.6)) * s / 6;
-      ctx.strokeStyle = fast ? "#ffd33d" : faint ? "#3fb95077" : "#3fb950cc";
-      ctx.lineWidth = fast ? 2.2 : faint ? 1 : 1.4;
+      const isChosen = st === chosen;
+      const clickR = 2 / S.R.pix_arcsec * 6.15 * s;
+      const r = isChosen ? clickR + Math.max(5, s * 0.5) : (faint ? 6.5 : Math.max(6, 16 - st.g * 0.6)) * s / 6;
+      const lw = isChosen ? 3 : fast ? 2.2 : faint ? 1.6 : 1.6;
+      if (faint && !isChosen) ctx.setLineDash([Math.max(3, s * 0.45), Math.max(2, s * 0.3)]);
+      // dark line underneath, so the ring reads on bright and dark sky alike
+      ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.lineWidth = lw + 2;
       ctx.beginPath(); ctx.arc(x * s, y * s, r, 0, 2 * Math.PI); ctx.stroke();
+      ctx.strokeStyle = fast ? "#ffd33d" : isChosen ? "#56f06e" : "#4fd765";
+      ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(x * s, y * s, r, 0, 2 * Math.PI); ctx.stroke();
+      ctx.setLineDash([]);
+      if (isChosen) {
+        const label = `Gaia star, G ${st.g.toFixed(1)}`;
+        ctx.font = `600 ${Math.max(12, Math.round(W / 48))}px system-ui`;
+        const tw = ctx.measureText(label).width;
+        let lx = x * s + r + 6, ly = y * s - r * 0.6;
+        if (lx + tw > W - 4) lx = x * s - r - 6 - tw;
+        ly = Math.min(W - 6, Math.max(16, ly));
+        ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.85)"; ctx.strokeText(label, lx, ly);
+        ctx.fillStyle = "#56f06e"; ctx.fillText(label, lx, ly);
+      }
       if (fast) {
         ctx.fillStyle = "#ffd33d"; ctx.font = `${Math.round(W / 50)}px system-ui`;
         ctx.fillText(`${(st.pm / 1000).toFixed(2)}″/yr`, x * s + r + 3, y * s - r);
@@ -638,7 +664,7 @@ function drawLegend() {
     el.innerHTML = `<span style="color:#ff6b5b">■</span> brighter than ${S.view === "diff" ? "average" : "first pass"} &nbsp; <span style="color:#5b8cff">■</span> fainter`;
     el.classList.remove("hidden");
   } else if (S.showGaia && S.gaia) {
-    el.innerHTML = `<span style="color:#3fb950">○</span> Gaia star (predicted position; small faint circles = faint stars) &nbsp; <span style="color:#ffd33d">○</span> fast mover, dashed = path`;
+    el.innerHTML = `<span style="color:#3fb950">○</span> Gaia star (predicted position) &nbsp; <span style="color:#4fd765">◌</span> dashed = faint Gaia star &nbsp; <span style="color:#ffd33d">○</span> fast mover, dashed = path`;
     el.classList.remove("hidden");
   } else el.classList.add("hidden");
 }
