@@ -224,3 +224,13 @@ body.flying .pick-panel, body.flying .guide-btn.floating, body.flying .hover-rea
   font-size: 12.5px; color: #d6e2ff; text-align: center; backdrop-filter: blur(6px); }
 .mini-bar { height: 5px; background: rgba(255,255,255,0.1); border-radius: 99px; margin-top: 6px; overflow: hidden; }
 .mini-bar > div { height: 100%; background: var(--grad); transition: width .4s; }
+.photo-exit { position: absolute; right: 12px; bottom: 12px; background: rgba(5,8,15,0.85); }
+.ast { border-top: 1px solid var(--line); padding: 10px 0 6px; }
+.ast:first-child { border-top: 0; padding-top: 2px; }
+.ast b { color: var(--text); font-size: 14.5px; }
+.ast .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; margin-left: 6px; border: 1px solid var(--line2); color: #cdd9e5; }
+.ast .tag.neo { border-color: #f2b84b; color: #f2b84b; }
+.ast .tag.caught { border-color: #ffc857; color: #ffc857; }
+.ast ul { margin: 4px 0 6px; padding-left: 18px; }
+.ast li { margin: 2px 0; color: #c6d1ea; font-size: 13px; }
+.ast .row { margin-top: 4px; }

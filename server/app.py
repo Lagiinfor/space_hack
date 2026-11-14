@@ -177,6 +177,25 @@ def movers(ra0: float, dec0: float, field: float):
     return analysis.movers(ra0, dec0, field)
 
 
+@app.get("/api/asteroids")
+def solar_system(ra0: float, dec0: float, field: float):
+    """Known asteroids/comets in the patch, photo by photo, with NASA/JPL's published risk info."""
+    _ready(ra0, dec0, field)
+    try:
+        return analysis.solar_system(ra0, dec0, field)
+    except Exception as e:
+        raise HTTPException(502, f"Could not reach the asteroid services: {e}")
+
+
+@app.get("/api/photo")
+def photo(ra0: float, dec0: float, field: float, obs_id: str, detector: int):
+    _ready(ra0, dec0, field)
+    try:
+        return analysis.single_photo(ra0, dec0, field, obs_id, detector)
+    except KeyError:
+        raise HTTPException(404, "That photo is not in this patch.")
+
+
 @app.get("/api/gaia")
 def gaia(ra0: float, dec0: float, field: float):
     _ready(ra0, dec0, field)

@@ -451,3 +451,46 @@ def movers(ra0: float, dec0: float, field_deg: float) -> dict:
                         shift=m["shift_arcsec"], sigma=m["sigma"], snr=m["snr"],
                         gaia=m.get("gaia")))
     return dict(movers=out, gaia_checked=gaia_ok)
+
+
+# ---------------------------------------------------------------- known asteroids and comets
+def solar_system(ra0: float, dec0: float, field_deg: float, with_risk: bool = True) -> dict:
+    """Known asteroids/comets that crossed the patch, photo by photo, whether SPHEREx
+    caught them, and NASA/JPL's published risk info for each. Cached per patch."""
+    from . import asteroids
+    pos = load_position(ra0, dec0, field_deg)
+    cache = flipbook.place_dir(pos["ra"], pos["dec"]) / f"asteroids_{field_deg:.3f}.json"
+    if cache.exists():
+        saved = json.loads(cache.read_text())
+        if saved.get("n_cuts") == len(pos["cuts"]):
+            return saved
+    res = asteroids.in_patch(pos, field_deg)
+    if with_risk:
+        def one(o):
+            des = str(o["number"]) if o.get("number") else o["name"]
+            try:
+                o["risk"] = asteroids.risk_info(des)
+            except Exception as e:
+                o["risk"] = dict(error=str(e))
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(6) as pool:
+            list(pool.map(one, res["objects"][:30]))
+    res["n_cuts"] = len(pos["cuts"])
+    cache.write_text(json.dumps(res))
+    return res
+
+
+def single_photo(ra0: float, dec0: float, field_deg: float, obs_id: str, detector: int) -> dict:
+    """One single SPHEREx photo of the patch, redrawn on the flip-book grid (no stacking,
+    so a fast-moving asteroid that is in only this photo is visible)."""
+    pos = load_position(ra0, dec0, field_deg)
+    grid, shape = frames.target_grid(pos["ra"], pos["dec"], field_deg)
+    for c in pos["cuts"]:
+        if c.obs_id == obs_id and c.detector == int(detector):
+            img = frames.resample(c.image, c.wcs, grid, shape)
+            img, _ = frames.fill_saturated_cores(img)     # a bright asteroid's burnt-out centre, for display
+            from astropy.stats import sigma_clipped_stats
+            _, _, sd = sigma_clipped_stats(img[np.isfinite(img)], sigma=3)
+            return dict(obs_id=obs_id, detector=c.detector, mjd=c.mjd, wl=c.wavelength, size=shape[0],
+                        noise=float(max(sd, 1e-6)), peak=float(np.nanmax(img)), pixels=flipbook._pack(img))
+    raise KeyError("photo not found")

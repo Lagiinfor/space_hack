@@ -43,5 +43,10 @@
   "ra": 260.6592,
   "dec": -23.8261,
   "how": "LDN 57"
+ },
+ "eros": {
+  "ra": 29.0314,
+  "dec": 28.7635,
+  "how": "Position of 433 Eros on 13 Jan 2026, 05:22 UTC (JPL Horizons)"
  }
 }

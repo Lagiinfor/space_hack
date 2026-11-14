@@ -56,4 +56,12 @@ TOUR = [
                "the stars behind it. Open the Water-ice lens: several stars seen through the cloud turn MAGENTA, "
                "because they lose light at 3 microns, where water ice absorbs. The ice coats dust grains inside "
                "the cloud: the raw material for comets and planets."),
+    dict(key="eros", name="Eros, near-Earth asteroid", query="29.0314 28.7635", band=6, field=0.06, group="extra",
+         kind="Asteroid caught in the act",
+         story="On 13 January 2026 SPHEREx photographed the near-Earth asteroid 433 Eros as it crossed this spot, "
+               "in 4 photos taken 2 minutes apart (8 with both detectors). Asteroids race across the sky, so Eros is "
+               "only in those photos: the stacked flip-book leaves it out as a one-off, but the Asteroids panel "
+               "finds it and plays its photos. NASA's published data says Eros is a near-Earth asteroid with no "
+               "chance of hitting Earth in the next 100 years; its next close pass is in 2056, at 58 times the "
+               "Moon's distance. (NASA's NEAR Shoemaker spacecraft landed on Eros in 2001.)"),
 ]

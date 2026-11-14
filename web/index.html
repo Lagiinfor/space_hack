@@ -6,10 +6,11 @@
 <title>SPHEREx Sky Flip-book</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=40">
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
 <script src="vendor/plotly.min.js" defer></script>
-<script src="app.js?v=30" defer></script>
+<script src="app.js?v=40" defer></script>
+<script src="asteroids.js?v=40" defer></script>
 <script type="module" src="picker.js?v=31"></script>
 </head>
 <body class="on-pick">
@@ -116,6 +117,7 @@
         </div>
         <div class="viewer-error hidden" id="viewerror"></div>
         <div class="sharpen hidden" id="sharpen"></div>
+        <button class="photo-exit hidden" id="photoexit">← Back to the flip-book</button>
       </div>
       <div class="hover" id="hover">Tip: click any star or dot to see what it is made of.</div>
 
@@ -142,6 +144,7 @@
           <div class="ctl-label">On the picture</div>
           <div class="row wrap">
             <button id="moversBtn" class="chip on" title="Arrows on everything the automatic search found moving">➜ Movers</button>
+            <button id="astBtn" class="chip on" title="Known asteroids and comets that passed through this patch">☄ Asteroids</button>
             <button id="gaiaBtn" class="chip" title="Circles where ESA's Gaia catalogue predicts each star on this date">◯ Gaia stars</button>
             <button id="cross" class="chip on">✛ Centre mark</button>
           </div>
@@ -219,6 +222,17 @@
         <p class="muted small-note">Found automatically: every dot is tracked across the sky passes, and anything that moved
           steadily is checked against ESA's Gaia catalogue. <b>Known</b> = Gaia predicts it. <b>Candidate</b> = nothing
           explains it, so it is worth a closer look.</p>
+      </div>
+
+      <div class="card hidden" id="astpanel">
+        <h2>☄ Asteroids and comets</h2>
+        <div id="astlist" class="muted"></div>
+        <p class="muted small-note">Known objects come from the IMCCE SkyBoT service, which predicts where every catalogued
+          asteroid and comet was at the moment of each photo. "Caught" means that single SPHEREx photo shows extra light
+          right where the object was predicted. Risk information is NASA/JPL's own published data (Small-Body Database,
+          Sentry impact monitoring, close-approach list); this tool does not calculate any risk itself. A few SPHEREx
+          photos cannot pin down an orbit, so for an unknown moving object the right step is to report it to the
+          <a href="https://minorplanetcenter.net/" target="_blank" rel="noopener">Minor Planet Center</a>, not to guess.</p>
       </div>
 
       <div class="card hidden" id="info">

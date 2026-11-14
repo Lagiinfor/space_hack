@@ -176,6 +176,8 @@ function showResult(R, keepBand, swapping) {
   }
   S.R = R;
   S.gaia = null; S.flags = null; S.lensData = null; S.click = null; S.spec = null; S.movers = null;
+  S.ast = null; S.photoView = null; S.photoSeq = null; clearTimeout(S.photoTimer);
+  $("photoexit").classList.add("hidden"); $("astpanel").classList.add("hidden");
   setup(keepBand);
 }
 
@@ -190,6 +192,7 @@ function showSharpening(stage, frac) {
 function afterFinal() {
   if (S.showGaia) loadGaia();
   loadMovers();
+  if (typeof loadAsteroids === "function") loadAsteroids();
 }
 
 // ------------------------------------------------------------------ building the player
@@ -345,7 +348,9 @@ function draw() {
   const px = img.data;
   let label = "", sub = "";
 
-  if (S.mode === "lens") {
+  if (S.photoView) {
+    [label, sub] = drawPhotoView(px, n);
+  } else if (S.mode === "lens") {
     if (!S.lensData) { loadLens(); return; }
     const L = S.lensData;
     const peak = L.peak, noise = L.noise;
@@ -453,6 +458,7 @@ function draw() {
 
 function drawOverlays(ctx, s) {
   const W = ctx.canvas.width;
+  if (typeof drawAsteroidMarkers === "function") drawAsteroidMarkers(ctx, s);
   if (S.cross) {
     const c = W / 2, g = W * 0.03, L = W * 0.05;
     ctx.strokeStyle = "#58a6ffbb"; ctx.lineWidth = 2;
