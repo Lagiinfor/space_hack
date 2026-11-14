@@ -43,7 +43,8 @@ const api = async (url, opts) => {
   }
   return r.json();
 };
-let posQuery = () => `ra0=${S.R.ra}&dec0=${S.R.dec}&field=${S.R.field_deg}`;
+let posQuery = () => `ra0=${S.R.ra}&dec0=${S.R.dec}&field=${S.R.field_deg}`;   // catalogs.js adds the catalogue choice
+const posKey = () => `ra0=${S.R.ra}&dec0=${S.R.dec}&field=${S.R.field_deg}`;     // the patch alone
 
 function unpack(b64) {
   const bin = atob(b64), buf = new Uint8Array(bin.length);
@@ -193,12 +194,12 @@ function showSharpening(stage, frac) {
 
 // things that need every photo: run them once the final result is in
 async function loadOther() {
-  const forPos = posQuery();
+  const forPos = posKey();
   $("otherinfo").textContent = "Looking for older photos of this spot from other telescopes...";
   $("otherBtn").disabled = true;
   try {
     const O = await api(`/api/other?${forPos}`);
-    if (!S.R || forPos !== posQuery()) return;
+    if (!S.R || forPos !== posKey()) return;
     for (const f of O.frames) { f.arr = unpack(f.pixels); f.other = true; }
     S.other = O;
     const w = O.frames.some((f) => f.source === "WISE");
@@ -748,9 +749,9 @@ function showLensBusy(on) {
 async function loadGaia() {
   $("gaiainfo").textContent = "Asking the Gaia archive for stars here...";
   try {
-    const forPos = posQuery();
+    const forPos = posKey();
     const g = await api(`/api/gaia?${forPos}`);
-    if (!S.R || forPos !== posQuery()) return;   // the person moved to another patch meanwhile
+    if (!S.R || forPos !== posKey()) return;   // the person moved to another patch meanwhile
     S.gaia = g;
     const fast = S.gaia.stars.filter((s) => s.pm > 200);
     $("gaiainfo").textContent = `Gaia DR3: ${S.gaia.n} stars brighter than G=19 in view` +

@@ -476,9 +476,21 @@ def solar_system(ra0: float, dec0: float, field_deg: float, with_risk: bool = Tr
     cache = flipbook.place_dir(pos["ra"], pos["dec"]) / f"asteroids_{field_deg:.3f}.json"
     if cache.exists():
         saved = json.loads(cache.read_text())
-        if saved.get("n_cuts") == len(pos["cuts"]):
+        # older saved files lack each asteroid's direction of travel (needed to draw its path)
+        has_dir = all("rate_e" in ph for o in saved.get("objects", []) for ph in o["photos"])
+        if saved.get("n_cuts") == len(pos["cuts"]) and has_dir:
             return saved
-    res = asteroids.in_patch(pos, field_deg)
+        if saved.get("n_cuts") == len(pos["cuts"]):
+            # complete but without directions: refresh it if the asteroid service answers,
+            # otherwise keep using the saved answer (the marks then have no direction line)
+            try:
+                res = asteroids.in_patch(pos, field_deg)
+            except Exception:
+                return saved
+        else:
+            res = asteroids.in_patch(pos, field_deg)
+    else:
+        res = asteroids.in_patch(pos, field_deg)
     if with_risk:
         def one(o):
             des = str(o["number"]) if o.get("number") else o["name"]

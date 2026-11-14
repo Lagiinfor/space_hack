@@ -321,7 +321,12 @@ renderChecks = function (C) {
   if (((C.simbad || {}).objects || []).length) knownIn.push("SIMBAD");
   if (((C.asteroids || {}).hits || []).length) knownIn.push("the list of known asteroids");
   const checked = [...(C.checked || []).filter((n) => n !== "SIMBAD"), "SIMBAD names", "known asteroids"].join(", ");
-  const verdict = !knownIn.length
+  const noStarCat = !(C.checked || []).some((n) => n !== "SIMBAD");
+  const verdict = !knownIn.length && noStarCat
+    ? `<div class="verdict known" style="color:#cfe6ff;border-color:rgba(108,196,255,0.5);background:rgba(108,196,255,0.07)">` +
+      `No star catalogue is switched on, so the tool cannot tell whether this object is already known. ` +
+      `Switch on Gaia (and others) under "Catalogues of known objects" before reporting it.</div>`
+    : !knownIn.length
     ? `<div class="verdict new">★ Unexplained by what was checked (${esc(checked)}). That does not prove it is new: switch on more catalogues to check further. It is worth a report.</div>`
     : `<div class="verdict known">✔ Already known: listed in ${esc(knownIn.join(", ").replace(/, ([^,]*)$/, " and $1"))}. Knowing that is useful too: nothing lost by having looked.</div>`;
   return `<div class="ctl-label">Automatic checks</div>${verdict}<ul class="checks">` +

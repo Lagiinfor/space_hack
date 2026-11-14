@@ -14,10 +14,10 @@ async function loadAsteroids() {
   $("astpanel").classList.remove("hidden");
   $("astlist").textContent = "Asking which known asteroids and comets were in this patch when each photo was taken " +
     "(the first time for a patch this takes up to a minute)...";
-  const forPos = posQuery();
+  const forPos = posKey();
   try {
     const A = await api(`/api/asteroids?${forPos}`);
-    if (!S.R || forPos !== posQuery()) return;
+    if (!S.R || forPos !== posKey()) return;
     S.ast = A;
     renderAsteroids();
     draw();
@@ -73,7 +73,7 @@ function renderAsteroids() {
     html += `<div class="ast"><b>${des}</b>` +
       (o.risk && o.risk.neo ? `<span class="tag neo">near-Earth</span>` : "") +
       (o.n_caught ? `<span class="tag caught">caught in ${o.n_caught} of ${o.n_photos} photos</span>` :
-        `<span class="tag">in ${o.n_photos} photo${o.n_photos > 1 ? "s" : ""}, too faint to see</span>`) +
+        `<span class="tag">in ${o.n_photos} photo${o.n_photos > 1 ? "s" : ""}, too faint to see; its place is marked on the picture</span>`) +
       `<div class="muted small-note">${o.kind || ""} · brightness ${o.vmag ?? "?"} (a smaller number is brighter) · ` +
       `${mjdToText(first.mjd)}, moving ${first.rate.toFixed(0)}″ per hour</div>` +
       `<ul>${riskLines(o).map((l) => `<li>${l}</li>`).join("")}</ul>` +
@@ -86,30 +86,83 @@ function renderAsteroids() {
 }
 
 // ---------------------------------------------------------------- markers on the picture
+// Every known asteroid or comet that crossed the patch is marked where it was, whether
+// SPHEREx could see it or not: a diamond at its place in each photo, a dashed line along the
+// way it was travelling, and a label with its name and date. Gold = SPHEREx caught it;
+// pale = too faint to see. In frames of another pass the mark is dimmer (it was not there then).
 function drawAsteroidMarkers(ctx, s) {
   if (!S.showAst || !S.ast || !S.R) return;
   const W = ctx.canvas.width;
-  let photos = [];
+  const half = S.R.field_deg * 1800;
   if (S.photoView) {
     for (const o of S.ast.objects) for (const p of o.photos)
-      if (p.obs_id === S.photoView.obs_id && p.detector === S.photoView.detector) photos.push({ o, p });
-  } else if (S.mode === "flip" && S.view !== "stack") {
-    const k = currentFrame().pass_index;
-    for (const o of S.ast.objects) for (const p of o.photos) if (p.pass_index === k) photos.push({ o, p });
+      if (p.obs_id === S.photoView.obs_id && p.detector === S.photoView.detector) astMark(ctx, s, W, o, [p], 1, true);
+    return;
   }
-  const labelled = new Set();
-  for (const { o, p } of photos) {
-    const [x, y] = skyToCanvas(p.east, p.north).map((v) => v * s);
-    const r = W / 60;
-    ctx.strokeStyle = p.seen ? "#ffc857" : "rgba(200,200,200,0.45)";
-    ctx.lineWidth = p.seen ? 2 : 1;
-    ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.stroke();
-    if (!labelled.has(o.name) && (p.seen || S.photoView)) {
-      labelled.add(o.name);
-      ctx.fillStyle = "#ffc857"; ctx.font = `bold ${Math.round(W / 45)}px system-ui`;
-      ctx.fillText(`☄ ${o.name}`, x + r + 4, y - r);
+  const f = S.mode === "flip" && S.view !== "stack" ? currentFrame() : null;
+  const k = f && !f.other ? f.pass_index : null;
+  for (const o of S.ast.objects) {
+    // one mark per visit: photos taken within a few hours of each other
+    const visits = [];
+    for (const p of [...o.photos].sort((x, y) => x.mjd - y.mjd)) {
+      const v = visits[visits.length - 1];
+      if (v && p.mjd - v[v.length - 1].mjd < 0.25) v.push(p); else visits.push([p]);
     }
+    for (const v of visits) astMark(ctx, s, W, o, v, k === null || v[0].pass_index === k ? 1 : 0.45, false, half);
   }
+}
+
+function astMark(ctx, s, W, o, photos, alpha, single, half) {
+  const seen = photos.some((p) => p.seen);
+  const col = seen ? "#ffc857" : "#e6edf7";
+  const r = W / 60;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const p0 = photos[0];
+  // the way it was travelling: a dashed line across the patch, with an arrowhead
+  if (!single && p0.rate_e !== undefined && p0.rate > 0) {
+    const ue = p0.rate_e / p0.rate, un = p0.rate_n / p0.rate;
+    const span = Math.min(half * 0.9, Math.max(25, p0.rate * 1.5));        // about 1.5 hours of travel each way
+    // keep both ends inside the picture, so the arrowhead is always visible
+    const reach = (dir) => {
+      let t = span;
+      for (const [c, u] of [[p0.east, ue * dir], [p0.north, un * dir]])
+        if (u !== 0) t = Math.min(t, ((u > 0 ? half * 0.94 : -half * 0.94) - c) / u);
+      return Math.max(0, t);
+    };
+    const tA = reach(-1), tB = reach(1);
+    const A = skyToCanvas(p0.east - ue * tA, p0.north - un * tA).map((v) => v * s);
+    const B = skyToCanvas(p0.east + ue * tB, p0.north + un * tB).map((v) => v * s);
+    for (const [c, w] of [["rgba(0,0,0,0.7)", 4], [col, 1.8]]) {
+      ctx.strokeStyle = c; ctx.lineWidth = w; ctx.setLineDash([7, 6]);
+      ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    const ang = Math.atan2(B[1] - A[1], B[0] - A[0]), h = W / 55;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(B[0], B[1]);
+    ctx.lineTo(B[0] - h * Math.cos(ang - 0.45), B[1] - h * Math.sin(ang - 0.45));
+    ctx.lineTo(B[0] - h * Math.cos(ang + 0.45), B[1] - h * Math.sin(ang + 0.45));
+    ctx.closePath(); ctx.fill();
+  }
+  const spots = new Map();
+  for (const p of photos) spots.set(`${p.east.toFixed(1)},${p.north.toFixed(1)}`, p);
+  for (const p of spots.values()) {
+    const [x, y] = skyToCanvas(p.east, p.north).map((v) => v * s);
+    const path = () => { ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); };
+    ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.lineWidth = 4.5; path(); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = 2.2; path(); ctx.stroke();
+  }
+  const [x, y] = skyToCanvas(p0.east, p0.north).map((v) => v * s);
+  const day = new Date((p0.mjd - 40587) * 86400000).toISOString().slice(0, 10);
+  const label = `☄ ${o.name}` + (single ? "" : `, ${day}`) + (seen ? "" : " (too faint to see)");
+  ctx.font = `bold ${Math.max(12, Math.round(W / 50))}px system-ui`;
+  const tw = ctx.measureText(label).width;
+  let lx = x + r + 5; if (lx + tw > W - 4) lx = x - r - 5 - tw;
+  const ly = Math.min(W - 6, Math.max(16, y - r - 2));
+  ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.85)"; ctx.strokeText(label, lx, ly);
+  ctx.fillStyle = col; ctx.fillText(label, lx, ly);
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------- single photos

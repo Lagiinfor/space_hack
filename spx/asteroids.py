@@ -122,7 +122,7 @@ def in_patch(pos: dict, field_deg: float, progress=lambda s: None) -> dict:
                     continue                      # outside the patch shown
                 o["photos"].append(dict(i=i, obs_id=c.obs_id, mjd=c.mjd, pass_index=int(passes[i]), detector=c.detector,
                                         wl=c.wavelength, ra=r_, dec=d_, east=east, north=north,
-                                        rate=float(np.hypot(dra_h, dde_h))))
+                                        rate=float(np.hypot(dra_h, dde_h)), rate_e=dra_h, rate_n=dde_h))
     objects = {k: o for k, o in objects.items() if o["photos"]}
 
     # did SPHEREx catch it? compare each photo with the other photos of the same pass
