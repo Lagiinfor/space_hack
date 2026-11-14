@@ -23,5 +23,25 @@
   "ra": 133.7593,
   "dec": -7.2421,
   "how": "WISEA J085510.74-071442.5: catalogue position moved forward to 2026.2 (214\u2033 of motion since 2000)"
+ },
+ "luhman16": {
+  "ra": 162.2951,
+  "dec": -53.3169,
+  "how": "NAME Luhman 16: catalogue position moved forward to 2026.2 (73\u2033 of motion since 2000)"
+ },
+ "kapteyn": {
+  "ra": 77.986,
+  "dec": -45.06,
+  "how": "HD 33793: catalogue position moved forward to 2026.2 (226\u2033 of motion since 2000)"
+ },
+ "m82": {
+  "ra": 148.9685,
+  "dec": 69.6797,
+  "how": "M 82"
+ },
+ "barnard68": {
+  "ra": 260.6592,
+  "dec": -23.8261,
+  "how": "LDN 57"
  }
 }

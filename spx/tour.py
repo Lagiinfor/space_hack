@@ -32,4 +32,28 @@ TOUR = [
                "June 2025 pass is clearly brighter than the November 2025 and June 2026 passes across most of the "
                "spectrum, a change much bigger than the measuring uncertainty. Note the wavy shape: that is water "
                "vapour in the giant's cool outer layers."),
+    # ---- "More to explore": extra showpieces, each tested in SPHEREx data (14 Nov 2026)
+    dict(key="luhman16", name="Luhman 16", query="Luhman 16", band=6, field=0.06, group="extra",
+         kind="Nearest brown dwarfs",
+         story="The closest brown dwarfs to the Sun, a pair 6.5 light-years away, only found in 2013. They are too "
+               "red and faint for Gaia's catalogue, so the tool's automatic search flags them as a CANDIDATE mover "
+               "at 2.8 arcseconds a year, exactly their known speed: a rediscovery with no hint. Their light peaks "
+               "near 4 microns, the signature of a cool brown dwarf."),
+    dict(key="kapteyn", name="Kapteyn's Star", query="Kapteyn's star", band=3, field=0.06, group="extra",
+         kind="Runaway old star",
+         story="One of the fastest stars on the sky, 8.6 arcseconds a year, 13 light-years away. It is an ancient "
+               "star from the Milky Way's halo, cutting through our neighbourhood on a strange orbit. The search "
+               "finds it as a KNOWN mover (Gaia predicts it); watch it hop between passes."),
+    dict(key="m82", name="M82 (Cigar Galaxy)", query="M82", band=0, field=0.06, group="extra",
+         kind="Starburst galaxy",
+         story="A galaxy 12 million light-years away making stars ten times faster than the Milky Way. Open the "
+               "Methane lens: the disk of stars looks blue-white, but a GREEN glow rises above and below it. That "
+               "is the 3.3-micron light of tiny carbon-rich dust grains (PAHs) blown out of the galaxy by the "
+               "starburst's wind. Nothing moves here, which is what a galaxy should do."),
+    dict(key="barnard68", name="Barnard 68", query="Barnard 68", band=0, field=0.06, group="extra",
+         kind="Dark cloud full of ice",
+         story="A cold, dark cloud of gas and dust, a future birthplace of stars, 400 light-years away. It hides "
+               "the stars behind it. Open the Water-ice lens: several stars seen through the cloud turn MAGENTA, "
+               "because they lose light at 3 microns, where water ice absorbs. The ice coats dust grains inside "
+               "the cloud: the raw material for comets and planets."),
 ]

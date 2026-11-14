@@ -57,7 +57,7 @@ def _load(ra, dec, field_deg, key):
         from . import archive
         images = json.loads(listing.read_text())
         have = len(list(cdir.glob("*.fits"))) if cdir.exists() else 0
-        if have < len(images):   # any missing photo is tried again (already-saved ones are skipped)
+        if have < 0.97 * len(images):   # many missing: try again (already-saved photos are skipped)
             print(f"  downloading the single photos for RA {ra} Dec {dec} (needed for spectra and lenses)...")
             archive.fetch_all(images, ra, dec, cut_deg, cdir)
     cuts = []

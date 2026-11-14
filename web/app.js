@@ -237,7 +237,7 @@ function fillPatchInfo() {
   const tt = S.tourKey && S.tour.find((t) => t.key === S.tourKey);
   $("tourpanel").classList.toggle("hidden", !tt);
   if (tt) { $("tourkind").textContent = tt.kind; $("tourname").textContent = tt.name; $("tourstory").textContent = tt.story; }
-  $("summary").textContent = (R.complete === false ? "Part of the archive did not answer, so some exposures may be missing; spectra and lenses need the full set, try this spot again later. " : "") +
+  $("summary").textContent = (R.complete === false && !R.preview ? `NASA's archive did not deliver ${R.n_images - R.n_used} of the ${R.n_images} photos; they are left out (and tried again on a later visit). ` : "") +
     `RA ${R.ra.toFixed(4)}°, Dec ${R.dec.toFixed(4)}°. ${R.n_used} of ${R.n_images} SPHEREx exposures used, ` +
     `in ${R.passes.length} sky passes. Pixel size on screen: ${R.pix_arcsec}″ (SPHEREx pixels are 6.15″).`;
   let t = "<tr><th>Pass</th><th>Dates</th><th>Exposures</th></tr>";

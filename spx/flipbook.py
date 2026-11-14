@@ -40,13 +40,19 @@ def saved_path(ra: float, dec: float, field_deg: float) -> Path:
     return p if p.exists() else p.with_name(p.stem + "_partial.json")
 
 
-def is_current(ra: float, dec: float, field_deg: float) -> bool:
-    """A saved result exists and was made by the current version of the stacking code."""
-    p = result_path(ra, dec, field_deg)
+def is_current(ra: float, dec: float, field_deg: float, nearly: float = 0.97) -> bool:
+    """A saved result exists, was made by the current stacking code, and is complete,
+    or nearly so: if NASA keeps failing on a handful of photos (here: 3% or fewer) we
+    show what we have straight away (labelled as missing those photos) instead of
+    making the person wait for retries every time."""
+    p = saved_path(ra, dec, field_deg)
     try:
-        return p.exists() and json.loads(p.read_text()).get("version") == RESULT_VERSION
+        r = json.loads(p.read_text()) if p.exists() else None
     except Exception:
         return False
+    if not r or r.get("version") != RESULT_VERSION or r.get("preview"):
+        return False
+    return bool(r.get("complete")) or r["n_used"] >= nearly * r["n_images"]
 
 
 def _pack(a: np.ndarray) -> str:
