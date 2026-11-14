@@ -216,6 +216,9 @@ async function loadOther() {
 }
 
 function afterFinal() {
+  // a "follow this comet/asteroid" patch: photos are re-centred on a moving object, so the
+  // sky-fixed tools (spectrum, picks, catalogues) do not apply
+  if (S.R.follow) { if (typeof followSetup === "function") followSetup(); return; }
   if (typeof loadPicks === "function") loadPicks();
   loadOther();
   if (S.showGaia) loadGaia();
@@ -295,7 +298,12 @@ function otherFrames() {
   const wise = S.band >= 5 ? "W2" : "W1";
   return S.other.frames.filter((f) => f.source !== "WISE" || f.band === wise);
 }
-function timelineFrames() { return [...otherFrames(), ...blinkFrames()]; }
+function timelineFrames() {
+  const o = otherFrames(), b = blinkFrames();
+  if (!o.length) return b;
+  const when = (f) => f.other ? f.mjd : S.R.passes[f.pass_index].mjd;
+  return [...o, ...b].sort((x, y) => when(x) - when(y));
+}
 function currentFrame() {
   const fs = timelineFrames();
   return fs[S.frameIdx % fs.length];
@@ -504,7 +512,10 @@ function draw() {
       : (f.wl_min ? `${f.wl_min.toFixed(2)}–${f.wl_max.toFixed(2)} µm, same wavelength mix in every pass` : "");
     const nimg = S.view === "stack" ? fs.reduce((s, g) => s + g.n, 0) : f.n;
     const skipped = all.filter((g) => !fs.includes(g)).map((g) => S.R.passes[g.pass_index].label);
-    sub = `${nimg} exposures used · ${bandName}` +
+    if (S.R.follow) sub = `${nimg} SPHEREx photos re-centred on ${S.R.follow.name} and stacked · ` +
+      (S.band === 0 ? `${f.n_detectors ?? ""} detectors` : `${f.wl_min.toFixed(2)}–${f.wl_max.toFixed(2)} µm`) +
+      (f.snr ? ` · signal at the centre: ${f.snr}× the noise` : "");
+    else sub = `${nimg} exposures used · ${bandName}` +
       (skipped.length ? ` · ${skipped.join(", ")} left out (too few photos or missing wavelengths)` : "") +
       (f.limited && fs.includes(f) ? " · LIMITED COMPARISON: this pass lacks some wavelengths" : "");
   }
@@ -649,8 +660,8 @@ function play(on) {
 
 // ------------------------------------------------------------------ modes, lenses, overlays
 function setMode(m) {
-  if (m === "lens" && S.R && S.R.preview) {
-    $("hover").textContent = "Chemistry filters open as soon as all photos are downloaded.";
+  if (m === "lens" && S.R && (S.R.preview || S.R.follow)) {
+    $("hover").textContent = S.R.follow ? "Chemistry filters are switched off in the follow-the-object view." : "Chemistry filters open as soon as all photos are downloaded.";
     m = "flip";
   }
   S.mode = m;
@@ -776,6 +787,7 @@ function snapToStar(cx, cy) {
 async function clickSpectrum(e) {
   if (!S.R) return;
   if (typeof practiceClick === "function" && practiceClick(e)) return;
+  if (S.R.follow) { $("hover").textContent = `This view follows ${S.R.follow.name}: each photo is re-centred on it, so clicking for a spectrum is switched off here.`; return; }
   if (S.R.preview) { $("hover").textContent = "Spectra open as soon as all photos are downloaded (see the bar at the top of the picture)."; return; }
   const r = e.target.getBoundingClientRect();
   const n = S.R.size;

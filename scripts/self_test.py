@@ -140,6 +140,19 @@ if have(269.4464, 4.7686):
     w = objcheck.what_is_it(analysis.spectrum(269.4464, 4.7686, 0.06, 269.44387, 4.79629))
     check("ordinary field star is read as an ordinary star", "ordinary star" in w["label"], w["label"])
 
+# published SPHEREx brown-dwarf templates (Gagne et al. 2026): type must come out right
+if have(331.097, -56.8008):
+    w = objcheck.what_is_it(analysis.spectrum(331.097, -56.8008, 0.06, 331.097, -56.8008))
+    t = (w.get("template") or {}).get("best", "")
+    check("templates: Epsilon Indi B (true types T1+T6) matches a T-type template", w.get("method") == "templates" and t.startswith("T"), t)
+if have(162.2951, -53.3169):
+    w = objcheck.what_is_it(analysis.spectrum(162.2951, -53.3169, 0.06, 162.2951, -53.3169))
+    t = (w.get("template") or {}).get("best", "")
+    check("templates: Luhman 16 (true types L7.5+T0.5) matches L7 to T1", w.get("method") == "templates" and t in ("L7", "L8", "L9", "T0", "T1"), t)
+if have(269.4464, 4.7686):
+    w = objcheck.what_is_it(analysis.spectrum(269.4464, 4.7686, 0.06, 269.44387, 4.79629))
+    check("templates: an ordinary star is NOT called a brown dwarf", w.get("method") != "templates", w["label"])
+
 if have(76.9566, 30.4013):
     pk = analysis.picks(76.9566, 30.4013, 0.06)["picks"]
     check("computer's picks: RW Aurigae flagged as 'changed brightness', not as a mover",

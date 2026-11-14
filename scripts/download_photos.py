@@ -20,7 +20,9 @@ if len(sys.argv) >= 3:
     positions.append((float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3]) if len(sys.argv) > 3 else 0.06))
 else:
     tour = json.loads((ROOT / "data" / "tour.json").read_text())
-    positions = [(t["ra"], t["dec"], 0.06) for t in tour.values()]
+    from spx.tour import TOUR
+    fields = {t["key"]: t["field"] for t in TOUR}
+    positions = [(t["ra"], t["dec"], fields.get(k, 0.06)) for k, t in tour.items()]
 
 for ra, dec, field in positions:
     print(f"\nRA {ra}  Dec {dec}:")

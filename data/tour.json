@@ -48,5 +48,10 @@
   "ra": 29.0314,
   "dec": 28.7635,
   "how": "Position of 433 Eros on 13 Jan 2026, 05:22 UTC (JPL Horizons)"
+ },
+ "atlas3i": {
+  "ra": 245.7594,
+  "dec": -16.6614,
+  "how": "Where 3I/ATLAS was on 2025-08-11 (NASA/JPL Horizons)"
  }
 }

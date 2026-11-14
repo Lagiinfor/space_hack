@@ -390,6 +390,23 @@ function endPractice() {
   backToSky();
 }
 
+// ====================================================================== follow a moving object
+function followSetup() {
+  const F = S.R.follow;
+  const O = { frames: (F.other || []).map((f) => ({ ...f, arr: unpack(f.pixels), other: true })), neossat: F.neossat };
+  S.other = O;
+  S.showOther = O.frames.length > 0;
+  $("otherBtn").disabled = !O.frames.length;
+  for (const id of ["moverpanel", "astpanel", "specpanel"]) $(id).classList.add("hidden");
+  $("summary").textContent = F.note + ` ${S.R.n_used} SPHEREx photos contain it in this window. ` +
+    "The centre mark is where the object should be; a real detection is a dot exactly there, in more than one frame.";
+  $("otherinfo").innerHTML = O.frames.length
+    ? `🇨🇦 <b>Canada's NEOSSat followed ${esc(F.name)} too</b>: ${O.frames.map((f) => `${f.date_text} (${f.n} photos, centre ${f.snr}× the noise)`).join(", ")}. Dashed buttons in the timeline.`
+    : (F.neossat && F.neossat.n_images ? "Canada's NEOSSat also photographed it, but those photos could not be lined up." : "");
+  $("hover").textContent = `Following ${F.name}: the dot at the centre mark is the object; stars have slid away.`;
+  refresh();
+}
+
 // ====================================================================== view controls
 S.zoom = 1;
 function setZoomOrigin() {

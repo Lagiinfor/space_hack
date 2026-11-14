@@ -36,7 +36,103 @@ def _band(wl, fl, lo, hi):
     return float(np.median(fl[m])) if m.sum() >= 2 else np.nan
 
 
+# ---- the published library of SPHEREx brown-dwarf spectra (Gagne et al. 2026, arXiv:2604.22012)
+# One standard template per spectral type M8 ... Y1, built from 6,003 SPHEREx spectra of
+# ultracool dwarfs. A local copy ships with the app (spx/templates), so this works offline.
+_TEMPLATES = None
+TYPE_ORDER = ["M8", "M9"] + [f"L{i}" for i in range(10)] + [f"T{i}" for i in range(10)] + ["Y0", "Y1"]
+
+
+def _templates():
+    global _TEMPLATES
+    if _TEMPLATES is None:
+        f = Path(__file__).parent / "templates" / "spiff_ultracool_templates.json"
+        d = json.loads(f.read_text())["templates"]
+        _TEMPLATES = {k: (np.array(v["wl"]), np.array(v["flam"])) for k, v in d.items()}
+    return _TEMPLATES
+
+
+def _plain(t):
+    kind = {"M": "a very cool red dwarf star, at the border between stars and brown dwarfs",
+            "L": "a warm brown dwarf (or the very coolest kind of star)",
+            "T": "a cold brown dwarf with methane in its air",
+            "Y": "one of the coldest brown dwarfs known"}[t[0]]
+    return kind
+
+
+def template_match(spec: dict) -> dict | None:
+    """Compare the spectrum with every template and with a plain glowing body (a star with
+    no molecule dips, any temperature). Returns the best type and how much better it fits."""
+    pts = [p for p in spec.get("points", []) if not p.get("outlier")]
+    if len(pts) < 40:
+        return None
+    wl = np.array([p["wl"] for p in pts]); fnu = np.array([p["flux"] for p in pts]); er = np.array([p["err"] for p in pts])
+    ok = (wl > 1.02) & (wl < 4.95) & np.isfinite(fnu)
+    wl, fnu, er = wl[ok], fnu[ok], er[ok]
+    if len(wl) < 40:
+        return None
+    flam = fnu / wl ** 2                      # templates are per unit wavelength
+    sig = np.sqrt((er / wl ** 2) ** 2 + (0.08 * np.abs(flam)) ** 2 + (0.02 * np.nanmedian(np.abs(flam))) ** 2)
+
+    def chi2(model):
+        w = 1 / sig ** 2
+        a = np.sum(w * flam * model) / np.sum(w * model * model)
+        if a <= 0:
+            return np.inf
+        return float(np.sum(w * (flam - a * model) ** 2) / (len(wl) - 1))
+
+    fits = {}
+    for name, (tw, tf) in _templates().items():
+        fits[name] = chi2(np.interp(wl, tw, tf))
+    # plain glowing bodies (Planck curves), 1,200 K to 20,000 K
+    best_bb = np.inf
+    for T in [1200, 1500, 1800, 2200, 2600, 3000, 3500, 4000, 5000, 6000, 8000, 12000, 20000]:
+        x = 14387.8 / (wl * T)
+        best_bb = min(best_bb, chi2(1 / (wl ** 5 * np.expm1(np.clip(x, 1e-6, 500)))))
+    order = sorted(fits, key=fits.get)
+    best = order[0]
+    close = [t for t in order if fits[t] <= fits[best] * 1.25 + 0.3]
+    idx = sorted(TYPE_ORDER.index(t) for t in close)
+    return dict(best=best, chi2=round(fits[best], 2), chi2_plain=round(best_bb, 2),
+                range=[TYPE_ORDER[idx[0]], TYPE_ORDER[idx[-1]]], n_close=len(close),
+                better=round(best_bb / max(fits[best], 1e-6), 1))
+
+
 def what_is_it(spec: dict) -> dict:
+    """First the published SPHEREx brown-dwarf templates; if none fits clearly better than a
+    plain star, fall back to simple shape rules (which also cover dusty objects)."""
+    rule = _what_by_rules(spec)
+    if spec.get("wing") or rule["confidence"] == "none":
+        return rule
+    try:
+        m = template_match(spec)
+    except Exception:
+        m = None
+    if not m:
+        return rule
+    rule["template"] = m
+    dusty = rule["label"].startswith("Extra infrared glow")
+    # a template wins when it fits much better than any plain star AND fits decently in itself
+    if m["better"] >= 3 and m["chi2"] < 6 and not (dusty and m["best"][0] in "ML" and m["better"] < 6):
+        lo, hi = m["range"]
+        span = TYPE_ORDER.index(hi) - TYPE_ORDER.index(lo)
+        rng = m["best"] if span == 0 else f"{lo} to {hi}"
+        conf = ("fairly confident" if m["better"] >= 8 and m["chi2"] < 3 and span <= 4 else "a reasonable guess")
+        why = [f"Best match among the 24 published SPHEREx brown-dwarf templates: type {m['best']}"
+               + (f" (types {rng} fit about equally well)" if span else "") + ".",
+               f"It fits {m['better']:.0f} times better than any plain star without molecule dips.",
+               "Templates: SPIFF library of 6,003 SPHEREx spectra of ultracool dwarfs (Gagné et al. 2026)."]
+        if m["chi2"] > 3:
+            why.append("The match is not tight, so the object may be blended with a neighbour or unusual.")
+        return dict(label=f"Looks like {_plain(m['best'])} (type {m['best']})", confidence=conf, why=why,
+                    template=m, numbers=rule.get("numbers"), method="templates")
+    rule["why"].insert(-1, "No published brown-dwarf template fits clearly better than a plain star "
+                           f"(best: {m['best']}, {m['better']:.1f} times better).")
+    rule["method"] = "rules"
+    return rule
+
+
+def _what_by_rules(spec: dict) -> dict:
     """A cautious, rule-based reading of the spectrum's shape. It compares the brightness
     in a few wavelength windows with what a plain, hot star would show (brightness falling
     as 1/wavelength^2 in the infrared) and looks for the dips molecules leave."""

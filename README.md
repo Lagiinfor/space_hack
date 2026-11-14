@@ -138,3 +138,28 @@ Parameters: `ra`, `dec` (degrees), `field` (degrees: 0.04, 0.06, 0.1, 0.15), `ba
 
 Not done yet: a "check NASA for newer photos" button (saved results do record their date), and passes are still split
 by 60-day gaps (fine for SPHEREx's real schedule; an unusual observing pattern could merge passes).
+
+## Volunteer tools and other telescopes (14 Nov 2026, evening)
+
+| Feature | Where | Code |
+|---|---|---|
+| **Older photos from other telescopes**: NASA WISE 2010 on every patch; Canada's NEOSSat wherever it looked. Extra, dashed timeline frames; never used in brightness comparisons. | "🛰 Older photos" chip | `spx/other_telescopes.py`, `analysis.other_frames` |
+| **NEOSSat star-matching**: archive photos have no precise sky coordinates, so each is matched to Gaia stars (rotation, flip and shift found by voting, then a least-squares fit) before stacking. | automatic | `other_telescopes._solve` |
+| **"What is it?"**: plain-language reading of the spectrum's shape (ordinary star / cool star / cold brown dwarf / dusty), with confidence and reasons. Rule-of-thumb, not a classification. | top of the spectrum panel | `spx/objcheck.what_is_it` |
+| **Automatic checks**: Gaia match, SIMBAD name (also at the year-2000 position for fast movers), known asteroids over the spot, measured motion, **partner star** moving the same way within 0.5 deg. | spectrum panel | `spx/objcheck.checks` |
+| **Report**: name for credit + note + all check results, saved to `reports/` and Downloads, or copied as text. Local only (no shared server yet). | "📝 Report this object" | `objcheck.save_report` |
+| **Single photos** behind any clicked spot. | "📷 Single photos" | `analysis.single_photo` |
+| **Computer's picks**: movers, brightness changes (same sign in 3+ detectors), unusually red objects. Hidden until asked when exploring freely; one-by-one yes/no mode. | "💡 Computer's picks" | `analysis.picks` |
+| **Practice mode**: 5 rounds on saved targets with known answers. | first screen | `web/tools.js` |
+| **Known asteroids + NASA risk info**; **follow a moving object** (re-centre every photo on a comet/asteroid using JPL Horizons, then stack). | ☄ panel; `scripts/follow_object.py` | `spx/asteroids.py` |
+| Zoom, inverted colours, tame bright stars, links to WiseView / Legacy Survey / SIMBAD / Aladin, keyboard shortcuts. | "More controls", spectrum panel | `web/tools.js` |
+
+Checks: `scripts/self_test.py` now runs 19 checks (adds: brown-dwarf reading, partner star, ordinary star reading,
+picks flag a variable star as "changed" not "moved", quiet field gives no picks).
+
+Credits: NEOSSat is a Canadian Space Agency mission; images from the Canadian Astronomy Data Centre (CADC, National
+Research Council of Canada). WISE/AllWISE and SPHEREx: NASA/IPAC IRSA. Gaia: ESA. SIMBAD/Sesame: CDS. SkyBoT: IMCCE.
+Small-body data and Horizons: NASA/JPL.
+
+"What is it?" now matches against the 24 published SPHEREx standard templates M8-Y1 (Gagne et al. 2026, Zenodo 10.5281/zenodo.19051216; local copy in spx/templates). Not done: the full per-object library (also in
+MOCAdb, Montreal); a shared reporting server.
