@@ -66,4 +66,12 @@ TOUR = [
                "finds it and plays its photos. NASA's published data says Eros is a near-Earth asteroid with no "
                "chance of hitting Earth in the next 100 years; its next close pass is in 2056, at 58 times the "
                "Moon's distance. (NASA's NEAR Shoemaker spacecraft landed on Eros in 2001.)"),
+    dict(key="atlas3i", name="3I/ATLAS, interstellar comet", query="245.7594 -16.6614", band=2, field=0.06,
+         group="extra", other=True,
+         kind="Visitor from another star",
+         story="Only the third object ever seen passing through our solar system from another star. In August 2025 "
+               "both SPHEREx and Canada's NEOSSat photographed it. It is too faint and too fast to see in any single "
+               "photo, so this view follows it: every photo is re-centred on where NASA's orbit says the comet was, "
+               "then stacked. The dot at the centre mark is the comet, 25 to 47 times above the noise in SPHEREx and "
+               "19 to 27 times in NEOSSat. Step through the dates: two telescopes, two countries, one visitor."),
 ]
