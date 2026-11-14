@@ -102,6 +102,7 @@ function skyToCanvas(east, north) {    // arcsec offsets -> data-pixel units
 async function go(q) {
   q = (q ?? $("where").value).trim();
   if (!q) return;
+  S.wantOther = false;
   $("where").value = q;
   $("error").textContent = "";
   $("resolved").textContent = "";
@@ -168,7 +169,7 @@ function showResult(R, keepBand, swapping) {
     S.R = R;
     S.flags = null; S.lensData = null;
     if (!R.frames.some((f) => f.band === S.band)) S.band = 0;
-    S.frameIdx = Math.min(keepIdx, Math.max(0, blinkFrames().length - 1));
+    S.frameIdx = Math.min(keepIdx, Math.max(0, timelineFrames().length - 1));
     fillPatchInfo();
     if (!R.preview) afterFinal();
     refresh();
@@ -176,6 +177,7 @@ function showResult(R, keepBand, swapping) {
   }
   S.R = R;
   S.gaia = null; S.flags = null; S.lensData = null; S.click = null; S.spec = null; S.movers = null;
+  S.other = null; S.showOther = false; $("otherinfo").textContent = "";
   S.ast = null; S.photoView = null; S.photoSeq = null; clearTimeout(S.photoTimer);
   $("photoexit").classList.add("hidden"); $("astpanel").classList.add("hidden");
   setup(keepBand);
@@ -189,7 +191,31 @@ function showSharpening(stage, frac) {
 }
 
 // things that need every photo: run them once the final result is in
+async function loadOther() {
+  const forPos = posQuery();
+  $("otherinfo").textContent = "Looking for older photos of this spot from other telescopes...";
+  $("otherBtn").disabled = true;
+  try {
+    const O = await api(`/api/other?${forPos}`);
+    if (!S.R || forPos !== posQuery()) return;
+    for (const f of O.frames) { f.arr = unpack(f.pixels); f.other = true; }
+    S.other = O;
+    const w = O.frames.some((f) => f.source === "WISE");
+    const nf = O.frames.filter((f) => f.source === "NEOSSat");
+    const ns = O.neossat || {};
+    $("otherinfo").innerHTML = "<b>Other telescopes:</b> " +
+      (w ? "NASA's WISE photographed this spot in 2010. " : "No WISE picture could be fetched. ") +
+      (ns.n_images ? `🇨🇦 <b>Canada's NEOSSat also looked here</b>: ${ns.n_images} photos, ${ns.first} to ${ns.last}` +
+          (nf.length ? ` (${nf.map((f) => f.date_text).join(", ")} added to the timeline).` : " (they could not be lined up with the stars, so they are not shown).")
+        : "Canada's NEOSSat has not photographed this spot (it covers only a few percent of the sky).");
+    $("otherBtn").disabled = !O.frames.length;
+    if (S.wantOther && O.frames.length) { S.showOther = true; S.wantOther = false; }
+    refresh();
+  } catch (e) { $("otherinfo").textContent = "Older photos from other telescopes could not be fetched right now."; }
+}
+
 function afterFinal() {
+  loadOther();
   if (S.showGaia) loadGaia();
   loadMovers();
   if (typeof loadAsteroids === "function") loadAsteroids();
@@ -261,10 +287,19 @@ function blinkFrames() {
   const fs = ok.length >= 2 ? ok : all;
   return S.blinkset === "ends" && fs.length > 2 ? [fs[0], fs[fs.length - 1]] : fs;
 }
+function otherFrames() {
+  // frames from other telescopes: only in the plain "Photos" view, never in comparisons
+  if (!S.showOther || !S.other || S.mode !== "flip" || S.view !== "normal") return [];
+  const wise = S.band >= 5 ? "W2" : "W1";
+  return S.other.frames.filter((f) => f.source !== "WISE" || f.band === wise);
+}
+function timelineFrames() { return [...otherFrames(), ...blinkFrames()]; }
 function currentFrame() {
-  const fs = blinkFrames();
+  const fs = timelineFrames();
   return fs[S.frameIdx % fs.length];
 }
+// the frame to use where a SPHEREx pass is needed (flags, asteroid markers ...)
+function currentPass() { const f = currentFrame(); return f && !f.other ? f.pass_index : null; }
 
 function updateURL() {
   if (!S.R) return;
@@ -277,13 +312,19 @@ function updateURL() {
 
 function refresh() {
   for (const b of $("bands").children) b.classList.toggle("on", parseInt(b.dataset.band) === S.band);
-  const fs = blinkFrames();
+  const fs = timelineFrames();
+  if (S.frameIdx >= fs.length) S.frameIdx = 0;
   $("passes").innerHTML = "";
   fs.forEach((f, i) => {
-    const p = S.R.passes[f.pass_index];
     const btn = document.createElement("button");
-    btn.className = "pass-chip";
-    btn.innerHTML = `<span class="dot" style="background:${PASS_COLORS[p.index % 6]}"></span>${p.label}<small>${f.n} photos</small>`;
+    btn.className = "pass-chip" + (f.other ? " other" : "");
+    if (f.other) {
+      btn.innerHTML = `<span class="dot" style="background:#9aa7c7"></span>${f.date_text}<small>${f.source}</small>`;
+      btn.title = f.note + ". A different telescope: use it to compare positions, not brightness.";
+    } else {
+      const p = S.R.passes[f.pass_index];
+      btn.innerHTML = `<span class="dot" style="background:${PASS_COLORS[p.index % 6]}"></span>${p.label}<small>${f.n} photos</small>`;
+    }
     btn.classList.toggle("on", i === S.frameIdx % fs.length);
     btn.onclick = () => { play(false); S.frameIdx = i; draw(); };
     $("passes").appendChild(btn);
@@ -291,6 +332,7 @@ function refresh() {
   $("cross").classList.toggle("on", S.cross);
   $("gaiaBtn").classList.toggle("on", S.showGaia);
   $("moversBtn").classList.toggle("on", S.showMovers);
+  $("otherBtn").classList.toggle("on", !!S.showOther);
   $("play").textContent = S.playing ? "❚❚" : "▶";
   for (const b of $("viewseg").children) b.classList.toggle("on", b.dataset.view === S.view || (S.view === "first" && b.dataset.view === "diff"));
   setStep(S.mode === "lens" || !$("specpanel").classList.contains("hidden") ? 3 : 2);
@@ -312,6 +354,20 @@ function stretchParams(frames) {
   const vmax = peak * Math.pow(10, -3 * $("bright").value / 100);
   const soft = noise * Math.pow(10, 2 - 3 * $("soft").value / 100);
   return { vmax, soft };
+}
+
+function drawOtherFrame(px, n, f) {
+  const vmax = f.peak * Math.pow(10, -3 * $("bright").value / 100);
+  const soft = f.noise * Math.pow(10, 2 - 3 * $("soft").value / 100);
+  const norm = Math.asinh(vmax / soft);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const src = (n - 1 - y) * n + x, o = (y * n + x) * 4, v = f.arr[src];
+    if (!Number.isFinite(v)) { const h = ((x + y) % 6 < 3) ? 34 : 26; px[o] = h; px[o + 1] = h + 2; px[o + 2] = h + 10; }
+    else { const c = 255 * Math.max(0, Math.min(1, Math.asinh(v / soft) / norm)); px[o] = c * 0.92; px[o + 1] = c * 0.96; px[o + 2] = c; }
+    px[o + 3] = 255;
+  }
+  const wl = f.source === "WISE" ? `infrared, ${f.wl} µm` : "visible light";
+  return [`${f.date_text} · ${f.source}`, `${wl} · a different telescope: compare positions, not brightness`];
 }
 
 function boxSmooth(a, n) {
@@ -350,6 +406,8 @@ function draw() {
 
   if (S.photoView) {
     [label, sub] = drawPhotoView(px, n);
+  } else if (S.mode === "flip" && currentFrame() && currentFrame().other) {
+    [label, sub] = drawOtherFrame(px, n, currentFrame());
   } else if (S.mode === "lens") {
     if (!S.lensData) { loadLens(); return; }
     const L = S.lensData;
@@ -440,7 +498,10 @@ function draw() {
     sub = `${nimg} exposures used · ${bandName}` +
       (skipped.length ? ` · ${skipped.join(", ")} left out (too few photos or missing wavelengths)` : "") +
       (f.limited && fs.includes(f) ? " · LIMITED COMPARISON: this pass lacks some wavelengths" : "");
-    for (const [i, b] of [...$("passes").children].entries()) b.classList.toggle("on", i === S.frameIdx % fs.length && S.view !== "stack");
+  }
+  if (S.mode === "flip") {
+    const nT = timelineFrames().length;
+    for (const [i, b] of [...$("passes").children].entries()) b.classList.toggle("on", i === S.frameIdx % nT && S.view !== "stack");
   }
   octx.putImageData(img, 0, 0);
   if ($("expdetails").open) listExposures();
@@ -468,7 +529,8 @@ function drawOverlays(ctx, s) {
     ctx.stroke();
   }
   if (S.showGaia && S.gaia) {
-    const passIdx = S.mode === "flip" && S.view !== "stack" ? currentFrame().pass_index : null;
+    const cf = S.mode === "flip" && S.view !== "stack" ? currentFrame() : null;
+    const passIdx = cf && !cf.other ? cf.pass_index : null;
     for (const st of S.gaia.stars) {
       const fast = st.pm > 200;
       if (!fast && st.g > GAIA_GMAX) continue;   // fainter Gaia stars are mostly invisible to SPHEREx
@@ -479,7 +541,7 @@ function drawOverlays(ctx, s) {
         st.track.forEach((t, i) => { const [x, y] = skyToCanvas(t[0], t[1]); i ? ctx.lineTo(x * s, y * s) : ctx.moveTo(x * s, y * s); });
         ctx.stroke(); ctx.setLineDash([]);
       }
-      const t = st.track[passIdx ?? Math.floor(st.track.length / 2)];
+      const t = cf && cf.other ? gaiaAt(st, cf.mjd) : st.track[passIdx ?? Math.floor(st.track.length / 2)];
       const [x, y] = skyToCanvas(t[0], t[1]);
       const r = Math.max(6, 16 - st.g * 0.6) * s / 6;
       ctx.strokeStyle = fast ? "#ffd33d" : "#3fb950cc";
@@ -529,6 +591,7 @@ function drawOverlays(ctx, s) {
 function listExposures() {
   if (!S.R || S.mode !== "flip") { $("explist").textContent = ""; return; }
   const f = currentFrame();
+  if (f.other) { $("explist").textContent = f.note + "."; return; }
   const ex = S.R.exposures.filter((e) => (S.view === "stack" || e.pass_index === f.pass_index) &&
     (S.band === 0 || e.band === S.band)).sort((a, b) => a.mjd - b.mjd);
   const date = (mjd) => new Date((mjd - 40587) * 86400000).toISOString().slice(0, 16).replace("T", " ");
@@ -536,9 +599,17 @@ function listExposures() {
     ex.map((e) => `<tr><td>${date(e.mjd)}</td><td>${e.band}</td><td>${e.wl.toFixed(3)} µm</td>${e.obs_id ? `<td>${e.obs_id}</td>` : ""}</tr>`).join("") + "</table>";
 }
 
+// where Gaia expects a star at another date: straight-line motion through its pass positions
+function gaiaAt(st, mjd) {
+  const P = S.R.passes, a = 0, b = st.track.length - 1;
+  if (b <= a) return st.track[0];
+  const f = (mjd - P[a].mjd) / (P[b].mjd - P[a].mjd);
+  return [st.track[a][0] + f * (st.track[b][0] - st.track[a][0]), st.track[a][1] + f * (st.track[b][1] - st.track[a][1])];
+}
+
 function drawLegend() {
   const el = $("legend");
-  if (S.mode === "flip" && S.flags && S.flagLayer && S.flags.key === `${currentFrame().pass_index}-${S.band}`) {
+  if (S.mode === "flip" && S.flags && S.flagLayer && S.flags.key === `${currentPass()}-${S.band}`) {
     const layer = S.flags.layers.find((l) => l.name === S.flagLayer);
     el.innerHTML = `<span style="color:#ffbe00">■</span> ${S.flagLayer}: flagged in up to ${Math.round(layer.max * 100)}% of the ${S.flags.n} exposures in this pass`;
     el.classList.remove("hidden");
@@ -552,7 +623,7 @@ function drawLegend() {
 }
 
 function speedMs() { return 800 / (parseFloat($("speed").value) || 1); }   // ×0.25 … ×2
-function step(k) { const n = blinkFrames().length; S.frameIdx = (S.frameIdx + k + n) % n; draw(); }
+function step(k) { const n = timelineFrames().length; S.frameIdx = (S.frameIdx + k + n) % n; draw(); }
 function play(on) {
   S.playing = on;
   clearTimeout(S.timer);
@@ -644,7 +715,7 @@ async function loadGaia() {
 
 let flagsPending = "";
 async function loadFlags() {
-  if (!S.flagLayer || S.mode !== "flip" || !S.R) { draw(); return; }
+  if (!S.flagLayer || S.mode !== "flip" || !S.R || currentPass() === null) return;
   const f = currentFrame();
   const key = `${f.pass_index}-${S.band}`, full = `${posQuery()}|${key}`;
   if (S.flags && S.flags.key === key && S.flags.pos === posQuery()) return;
@@ -808,7 +879,7 @@ function moveText(fol) {
 
 function nearestGaia(east, north) {
   if (!S.gaia) return null;
-  const passIdx = S.mode === "flip" && S.view !== "stack" ? currentFrame().pass_index : 0;
+  const passIdx = (S.mode === "flip" && S.view !== "stack" ? currentPass() : 0) ?? 0;
   let best = null;
   for (const s of S.gaia.stars) {
     const t = s.track[Math.min(passIdx, s.track.length - 1)];
@@ -837,7 +908,7 @@ async function saveGif() {
   if (!S.R || S.mode !== "flip") { $("sharemsg").textContent = "Switch to the flip-book to save an animation."; return; }
   const wasPlaying = S.playing; play(false);
   const keep = S.frameIdx, frames = [];
-  const n = blinkFrames().length;
+  const n = timelineFrames().length;
   for (let i = 0; i < n; i++) { S.frameIdx = i; draw(); frames.push(frameWithLabels()); }
   S.frameIdx = keep; draw();
   $("sharemsg").textContent = "Making the GIF...";
@@ -861,6 +932,7 @@ async function loadTour() {
 async function startTour(t) {
   S.tourKey = t.key;
   S.band = t.band; S.mode = "flip"; S.view = "normal"; $("view").value = "normal";
+  S.wantOther = !!t.other;
   const field = parseFloat($("field").value) || t.field;   // keep the size the person picked on the card
   history.replaceState(null, "", "?");
   try {
@@ -893,6 +965,11 @@ function wire() {
   $("blinkset").onchange = () => { S.blinkset = $("blinkset").value; S.frameIdx = 0; refresh(); };
   $("cross").onclick = () => { S.cross = !S.cross; refresh(); };
   $("moversBtn").onclick = () => { S.showMovers = !S.showMovers; refresh(); };
+  $("otherBtn").onclick = () => {
+    S.showOther = !S.showOther; S.frameIdx = 0;
+    if (S.showOther && S.view !== "normal") { S.view = "normal"; $("view").value = "normal"; }
+    refresh();
+  };
   $("gaiaBtn").onclick = () => { S.showGaia = !S.showGaia; if (S.showGaia && !S.gaia) loadGaia(); else refresh(); };
   $("tab-flip").onclick = () => setMode("flip");
   $("tab-lens").onclick = () => setMode("lens");
@@ -908,7 +985,7 @@ function wire() {
   };
   $("savepng").onclick = () => {
     const a = document.createElement("a");
-    const tag = S.mode === "lens" ? S.lensKey : (S.view === "stack" ? "stack" : S.R.passes[currentFrame().pass_index].label.replace(" ", ""));
+    const tag = S.mode === "lens" ? S.lensKey : (S.view === "stack" ? "stack" : (currentFrame().other ? currentFrame().source + currentFrame().date_text : S.R.passes[currentFrame().pass_index].label).replace(" ", ""));
     a.download = `spherex_${S.R.ra}_${S.R.dec}_band${S.band}_${tag}.png`;
     a.href = $("sky").toDataURL("image/png");
     a.click();
@@ -923,7 +1000,7 @@ function wire() {
     let val = "";
     if (S.mode === "flip") {
       const f = currentFrame(), x = Math.floor(cx), y = Math.floor(cy);
-      if (x >= 0 && y >= 0 && x < n && y < n) val = ` · ${f.arr[(n - 1 - y) * n + x].toFixed(3)} MJy/sr`;
+      if (!f.other && x >= 0 && y >= 0 && x < n && y < n) val = ` · ${f.arr[(n - 1 - y) * n + x].toFixed(3)} MJy/sr`;
     }
     const g = nearestGaia(sky.east, sky.north);
     $("hover").textContent = `RA ${sky.ra.toFixed(5)}°  Dec ${sky.dec.toFixed(5)}° · ${sky.east.toFixed(1)}″ E, ${sky.north.toFixed(1)}″ N of centre${val}` +

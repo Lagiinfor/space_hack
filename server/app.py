@@ -196,6 +196,13 @@ def photo(ra0: float, dec0: float, field: float, obs_id: str, detector: int):
         raise HTTPException(404, "That photo is not in this patch.")
 
 
+@app.get("/api/other")
+def other(ra0: float, dec0: float, field: float):
+    """Frames from other telescopes (WISE 2010, Canada's NEOSSat) for the patch."""
+    _ready(ra0, dec0, field)
+    return analysis.other_frames(ra0, dec0, field)
+
+
 @app.get("/api/gaia")
 def gaia(ra0: float, dec0: float, field: float):
     _ready(ra0, dec0, field)

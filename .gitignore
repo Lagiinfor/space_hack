@@ -26,3 +26,5 @@ data/*
 !data/ra148.9685_dec+69.6797/
 !data/ra260.6592_dec-23.8261/
 !data/ra29.0314_dec+28.7635/
+# raw NEOSSat downloads (the stacked result is kept)
+data/*/neossat/

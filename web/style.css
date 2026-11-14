@@ -234,3 +234,6 @@ body.flying .pick-panel, body.flying .guide-btn.floating, body.flying .hover-rea
 .ast ul { margin: 4px 0 6px; padding-left: 18px; }
 .ast li { margin: 2px 0; color: #c6d1ea; font-size: 13px; }
 .ast .row { margin-top: 4px; }
+.pass-chip.other { border-style: dashed; color: #c9d4ee; }
+.pass-chip.other small { color: #9aa7c7; }
+button:disabled { opacity: .45; cursor: default; }

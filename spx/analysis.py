@@ -494,3 +494,33 @@ def single_photo(ra0: float, dec0: float, field_deg: float, obs_id: str, detecto
             return dict(obs_id=obs_id, detector=c.detector, mjd=c.mjd, wl=c.wavelength, size=shape[0],
                         noise=float(max(sd, 1e-6)), peak=float(np.nanmax(img)), pixels=flipbook._pack(img))
     raise KeyError("photo not found")
+
+
+# ---------------------------------------------------------------- other telescopes
+def other_frames(ra0: float, dec0: float, field_deg: float) -> dict:
+    """WISE 2010 and NEOSSat frames for the patch (cached). Different telescopes: for
+    seeing position changes over many years, never for the fair brightness comparison."""
+    from . import other_telescopes as ot
+    ra0, dec0 = round(ra0, 4), round(dec0, 4)
+    pdir = flipbook.place_dir(ra0, dec0)
+    cache = pdir / f"other_{field_deg:.3f}.json"
+    if cache.exists():
+        return json.loads(cache.read_text())
+    out, notes = [], {}
+    try:
+        out += ot.wise_frames(ra0, dec0, field_deg)
+    except Exception as e:
+        notes["wise_error"] = str(e)
+    try:
+        nf, summary = ot.neossat_frames(ra0, dec0, field_deg, pdir / "neossat")
+        out += nf
+        notes["neossat"] = summary
+    except Exception as e:
+        notes["neossat_error"] = str(e)
+    for f in out:
+        img = f.pop("img")
+        f["peak"] = float(np.nanmax(img)) if np.isfinite(img).any() else 1.0
+        f["pixels"] = flipbook._pack(img)
+    res = dict(frames=sorted(out, key=lambda f: f["mjd"]), **notes)
+    cache.write_text(json.dumps(res))
+    return res

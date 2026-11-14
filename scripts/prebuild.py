@@ -27,6 +27,14 @@ for t in TOUR:
                            progress=lambda s, f: None)
         saved[t["key"]] = dict(ra=round(pos["ra"], 4), dec=round(pos["dec"], 4), how=pos.get("how", ""))
         tour_file.write_text(json.dumps(saved, indent=1))
+        # extras that would otherwise make the first visit wait: older photos from other
+        # telescopes (WISE, NEOSSat) and the known-asteroid check
+        from spx import analysis
+        for name, fn in (("older photos", analysis.other_frames), ("asteroid check", analysis.solar_system)):
+            try:
+                fn(saved[t["key"]]["ra"], saved[t["key"]]["dec"], t["field"])
+            except Exception as e:
+                print(f"  ({name} skipped: {e})", flush=True)
         print(f"  done: {r['n_used']} images, {len(r['passes'])} passes, {time.time() - t0:.0f} s", flush=True)
     except Exception as e:
         print(f"  FAILED: {e}", flush=True)
