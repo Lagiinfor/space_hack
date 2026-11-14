@@ -515,20 +515,39 @@ async function loadLenses() {
   if (p.get("lens")) S.lensKey = p.get("lens");
 }
 
-let lensLoading = false;
+// lens pictures already built for this patch, so switching back is instant
+const lensCache = new Map();
+let lensWanted = "";
 async function loadLens() {
-  if (lensLoading) return;
-  lensLoading = true;
-  $("lensexplain").textContent = "Building the lens view (stacking exposures by wavelength)...";
+  const pp = S.lensPass === "all" ? "" : `&pass_index=${S.lensPass}`;
+  const key = `${S.R.ra},${S.R.dec},${S.R.field_deg},${S.lensKey}${pp}`;
+  if (lensCache.has(key)) { S.lensData = lensCache.get(key); $("lensexplain").textContent = S.lensData.explain; draw(); return; }
+  if (lensWanted === key) return;          // already on its way
+  lensWanted = key;
+  $("lensexplain").textContent = "Building this filter: sorting every photo by the colour it saw (a few seconds)...";
+  showLensBusy(true);
   try {
-    const pp = S.lensPass === "all" ? "" : `&pass_index=${S.lensPass}`;
     const L = await api(`/api/lens?${posQuery()}&key=${S.lensKey}${pp}`);
     L.arr = L.channels.map(unpack);
+    lensCache.set(key, L);
+    if (lensWanted !== key) return;        // the person picked another filter meanwhile
     S.lensData = L;
     $("lensexplain").textContent = L.explain;
-  } catch (e) { $("lensexplain").textContent = "Could not build this lens: " + e.message; }
-  lensLoading = false;
-  if (S.lensData) draw();
+  } catch (e) {
+    if (lensWanted === key) $("lensexplain").textContent = "Could not build this filter: " + e.message;
+  } finally {
+    if (lensWanted === key) { lensWanted = ""; showLensBusy(false); }
+  }
+  if (S.lensData && S.mode === "lens") draw();
+}
+function showLensBusy(on) {
+  if (on) {
+    $("olabel").textContent = "Building filter...";
+    $("osub").textContent = "";
+    const ctx = $("sky").getContext("2d");
+    ctx.fillStyle = "rgba(5,8,15,0.6)";
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
 }
 
 async function loadGaia() {
