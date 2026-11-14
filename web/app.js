@@ -127,9 +127,12 @@ async function load(ra, dec, field, keepBand) {
   $("wherenow").textContent = `RA ${(+ra).toFixed(4)}°, Dec ${(+dec).toFixed(4)}°`;
   showProgress("Starting...", 0.01);
   $("error").textContent = "";
+  const token = (S.loadToken = (S.loadToken || 0) + 1);   // a newer click makes this one step aside
   const { job } = await api(`/api/flipbook?ra=${ra}&dec=${dec}&field=${field}`, { method: "POST" });
   while (true) {
+    if (token !== S.loadToken) return;
     const st = await api(`/api/job/${job}`);
+    if (token !== S.loadToken || st.state === "cancelled") return;
     showProgress(st.stage, st.frac);
     if (st.state === "error") return fail(st.stage);
     if (st.state === "done") break;
@@ -137,6 +140,7 @@ async function load(ra, dec, field, keepBand) {
   }
   showProgress("Unpacking pictures...", 1);
   const R = await api(`/api/job/${job}/result`);
+  if (token !== S.loadToken) return;
   for (const f of R.frames) f.arr = unpack(f.pixels);
   S.R = R;
   S.gaia = null; S.flags = null; S.lensData = null; S.click = null; S.spec = null; S.movers = null;

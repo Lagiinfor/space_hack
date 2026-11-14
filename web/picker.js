@@ -1,5 +1,5 @@
 // Glue between the 3D sky (sky.js) and the rest of the page (app.js).
-import { SkyPicker } from "./sky.js?v=9";
+import { SkyPicker } from "./sky.js?v=13";
 
 const $ = (id) => document.getElementById(id);
 const fmt = (ra, dec) => `RA ${ra.toFixed(3)}°, Dec ${dec >= 0 ? "+" : ""}${dec.toFixed(3)}°`;
@@ -50,7 +50,9 @@ $("pcgo").onclick = async () => {
   const { ra, dec, target } = current;
   $("pickcard").classList.add("hidden");
   document.body.classList.remove("has-card");
+  document.body.classList.add("flying");
   await sky.flyTo(ra, dec);
+  document.body.classList.remove("flying");
   document.body.classList.add("warp");
   setTimeout(() => document.body.classList.remove("warp"), 900);
   if (target && target.key) startTour(target);

@@ -33,6 +33,7 @@ async def no_stale_pages(request, call_next):
     return response
 JOBS: dict[str, dict] = {}
 ONE_AT_A_TIME = threading.Lock()  # be polite to the archive: one position at a time
+LATEST = [None]                    # the most recent download request
 
 
 @app.get("/api/resolve")
@@ -76,16 +77,23 @@ def start(ra: float, dec: float, field: float = 0.06):
         warm(ra, dec, field)
         return dict(job=job_id)
     job_id = uuid.uuid4().hex[:12]
-    job = JOBS[job_id] = dict(state="queued", stage="Waiting for the previous request", frac=0.0,
-                              args=(ra, dec, field))
+    job = JOBS[job_id] = dict(state="queued", stage="Stopping the patch you opened before (a few seconds)...",
+                              frac=0.0, args=(ra, dec, field))
+    LATEST[0] = job_id            # a newer request makes any older, unfinished one stop
+    stop = lambda: LATEST[0] != job_id  # noqa: E731
 
     def run():
         with ONE_AT_A_TIME:
+            if stop():
+                job.update(state="cancelled", stage="Replaced by a newer request")
+                return
             job["state"] = "running"
             try:
-                flipbook.build(ra, dec, field, progress=lambda s, f: job.update(stage=s, frac=f))
+                flipbook.build(ra, dec, field, progress=lambda s, f: job.update(stage=s, frac=f), stop=stop)
                 job.update(state="done", stage="Done", frac=1.0)
                 warm(ra, dec, field)
+            except flipbook.Cancelled:
+                job.update(state="cancelled", stage="Replaced by a newer request")
             except Exception as e:
                 traceback.print_exc()
                 job.update(state="error", stage=str(e))

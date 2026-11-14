@@ -43,7 +43,7 @@ select { background: rgba(0,0,0,0.35); border: 1px solid var(--line2); border-ra
 select option { background: #101624; }
 input[type=range] { flex: 1 1 140px; accent-color: #6cc4ff; }
 
-.brand { font-family: var(--display); font-size: 16px; letter-spacing: .3px; color: var(--text); display: inline-flex; align-items: center; gap: 8px; }
+.brand { white-space: nowrap; font-family: var(--display); font-size: 16px; letter-spacing: .3px; color: var(--text); display: inline-flex; align-items: center; gap: 8px; }
 .brand b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .brand.link { background: none; border: 0; padding: 4px 0; }
 .logo { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; align-items: center; justify-content: center;
@@ -217,3 +217,5 @@ summary { cursor: pointer; }
 .no3d { position: absolute; right: 30px; top: 40%; max-width: 380px; color: #c6d1ea; background: var(--panel); border: 1px solid var(--line2);
   border-radius: 14px; padding: 16px; font-size: 14px; }
 #globebtn { cursor: pointer; }
+body.flying .pick-panel, body.flying .guide-btn.floating, body.flying .hover-read, body.flying .sky-labels { opacity: 0; pointer-events: none; transition: opacity .4s; }
+.pick-panel, .guide-btn.floating, .sky-labels { transition: opacity .4s; }

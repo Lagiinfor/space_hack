@@ -118,12 +118,14 @@ def fetch_cutout(img: dict, ra: float, dec: float, size_deg: float, cache_dir: P
 
 
 def fetch_all(images: list[dict], ra: float, dec: float, size_deg: float,
-              cache_dir: Path, workers: int = 8, progress=None) -> list[tuple[dict, Path]]:
+              cache_dir: Path, workers: int = 8, progress=None, stop=None) -> list[tuple[dict, Path]]:
     """Download all cutouts in parallel. progress(done, total) is called as they arrive."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     done = [0]
 
     def one(im):
+        if stop and stop():   # the person moved on to another patch: skip the rest quickly
+            return None
         p = fetch_cutout(im, ra, dec, size_deg, cache_dir)
         done[0] += 1
         if progress:

@@ -37,7 +37,11 @@ def _pack(a: np.ndarray) -> str:
     return base64.b64encode(np.nan_to_num(a, nan=0.0).astype("<f4").tobytes()).decode()
 
 
-def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage, frac: None) -> dict:
+class Cancelled(Exception):
+    """The person asked for another patch before this one finished."""
+
+
+def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage, frac: None, stop=None) -> dict:
     ra, dec = round(ra, 4), round(dec, 4)
     out = result_path(ra, dec, field_deg)
     if out.exists():
@@ -54,7 +58,9 @@ def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage,
     progress(f"Downloading {len(images)} image cutouts", 0.05)
     got = archive.fetch_all(images, ra, dec, cut_deg, pdir / f"cutouts_{cut_deg}",
                             progress=lambda d, n: progress(f"Downloading image cutouts ({d} of {n})",
-                                                           0.05 + 0.75 * d / n))
+                                                           0.05 + 0.75 * d / n), stop=stop)
+    if stop and stop():
+        raise Cancelled()
 
     progress("Cleaning up the images", 0.82)
     cuts = []

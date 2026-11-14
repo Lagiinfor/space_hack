@@ -320,24 +320,37 @@ export class SkyPicker {
   }
 
   // ------------------------------------------------------------ fly into the chosen patch
-  flyTo(ra, dec, ms = 1600) {
+  // Two moves blended together: (1) orbit round the Earth to stand beside it, with the
+  // patch off to the side so the Earth is out of the way; (2) turn to face the patch and
+  // zoom in like a telescope (the field of view narrows from 55 to about 2 degrees).
+  flyTo(ra, dec, ms = 2400) {
     this.busy = true;
-    const dir = radecToVec(ra, dec);
-    const startPos = this.camera.position.clone();
-    const startFov = this.camera.fov;
-    const startLook = new THREE.Vector3(0, 0, 0);
-    const endPos = dir.clone().multiplyScalar(2.2);
-    const endLook = dir.clone().multiplyScalar(R_SKY);
     this.controls.enabled = false;
+    this.controls.autoRotate = false;
+    const dir = radecToVec(ra, dec);
+    const start = this.camera.position.clone();
+    const R = Math.max(start.length(), 3.2);
+    let side = start.clone().sub(dir.clone().multiplyScalar(start.dot(dir)));
+    if (side.lengthSq() < 1e-4) side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+    side.normalize();
+    const end = side.clone().multiplyScalar(0.97).addScaledVector(dir, -0.22).normalize().multiplyScalar(R);
+    const target = dir.clone().multiplyScalar(R_SKY);
+    const fov0 = this.camera.fov, fov1 = 2.2;
+    const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
     const t0 = performance.now();
     return new Promise((resolve) => {
       const step = () => {
         const f = Math.min(1, (performance.now() - t0) / ms);
-        const e = f < 0.5 ? 4 * f * f * f : 1 - Math.pow(-2 * f + 2, 3) / 2;   // ease in-out
-        this.camera.position.lerpVectors(startPos, endPos, e);
-        this.camera.fov = startFov + (6 - startFov) * Math.pow(e, 1.6);
+        const move = smooth(0, 0.55, f);                 // orbiting
+        const turn = smooth(0.1, 0.6, f);                // turning to face the patch
+        const zoom = smooth(0.45, 1, f);                 // telescope zoom
+        const p = start.clone().normalize().lerp(end.clone().normalize(), move).normalize()
+          .multiplyScalar(start.length() + (R - start.length()) * move);
+        this.camera.position.copy(p);
+        this.camera.lookAt(new THREE.Vector3().lerp(target, turn));
+        this.camera.fov = fov0 * Math.pow(fov1 / fov0, zoom);
         this.camera.updateProjectionMatrix();
-        this.camera.lookAt(startLook.clone().lerp(endLook, Math.min(1, e * 1.4)));
+        this.reticle.scale.setScalar(this.camera.fov / fov0);   // the ring keeps its size on screen while we zoom
         if (f < 1) requestAnimationFrame(step); else resolve();
       };
       step();
@@ -345,6 +358,7 @@ export class SkyPicker {
   }
 
   reset() {
+    this.reticle.scale.setScalar(1);
     this.camera.fov = 55; this.camera.updateProjectionMatrix();
     this.camera.position.set(1.4, 0.8, 4.3);
     this.controls.target.set(0, 0, 0);
@@ -384,11 +398,11 @@ export class SkyPicker {
     }
     const pulse = 1 + 0.25 * Math.sin(t * 3);
     for (const k of this.targets) {
-      k.mesh.scale.setScalar(pulse);
+      k.mesh.scale.setScalar(pulse * this.camera.fov / 55);   // same size on screen while zooming
       this.project(k.v, k.el, 14);
     }
     for (const c of this.constellationLabels || []) this.project(c.v, c.el);
-    this.controls.update();
+    if (!this.busy) this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 }
