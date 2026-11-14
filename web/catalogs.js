@@ -16,9 +16,9 @@ const CAT_LIST = [
   { key: "simbad", short: "SIMBAD", colour: "#c9a0ff" },
 ];
 const CAT = Object.fromEntries(CAT_LIST.map((c) => [c.key, c]));
-// each catalogue marks a source with its own quarter of a ring, so one object known in
-// several catalogues gets a ring of several colours
-const CAT_ARC = { catwise: [-90, 0], twomass: [0, 90], panstarrs: [90, 180], skymapper: [180, 270] };
+// each catalogue draws a full ring of its own colour and its own size, so an object known
+// in several catalogues gets several rings, one inside the other
+const CAT_RING = { catwise: 1.5, twomass: 1.85, panstarrs: 2.2, skymapper: 2.55 };   // radius, in picture pixels
 const CAT_FAINTEST = { panstarrs: 20, catwise: 16.8, skymapper: 19 };    // fainter sources are not drawn (SPHEREx cannot see them)
 
 S.cats = new Set(["gaia"]);
@@ -128,12 +128,15 @@ function drawCatalogMarks(ctx, s) {
           ctx.fillStyle = col; ctx.fillText(t, x + r + 4, y + r + 10);
         }
       } else {
-        const [a0, a1] = CAT_ARC[key].map((a) => a * Math.PI / 180);
-        const r = s * 1.45, lw = o.moves ? 3 : 2;
+        // the object under the click gets a bold ring outside the red click ring
+        const order = Object.keys(CAT_RING).indexOf(key);
+        const clickR = 2 / S.R.pix_arcsec * 6.15 * s + Math.max(5, s * 0.5);
+        const r = near ? clickR + (order + 1) * Math.max(6, s * 0.55) : s * CAT_RING[key];
+        const lw = near ? 3 : o.moves ? 2.4 : 1.6;
         ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.lineWidth = lw + 2;
-        ctx.beginPath(); ctx.arc(x, y, r, a0, a1); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
         ctx.strokeStyle = col; ctx.lineWidth = lw;
-        ctx.beginPath(); ctx.arc(x, y, r, a0 + 0.06, a1 - 0.06); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
       }
       if (near) labels.push([col, `${CAT[key].short}` + (o.type ? `: ${o.type}` : "") + (o.mag !== undefined ? ` ${o.band} ${o.mag}` : "") +
         (o.moves ? `, ${o.pm}″/yr` : o.old ? `, seen ${o.year}` : "")]);
@@ -141,7 +144,7 @@ function drawCatalogMarks(ctx, s) {
   }
   if (S.click && labels.length) {
     const [cx, cy] = skyToCanvas(S.click.east, S.click.north).map((v) => v * s);
-    const r = 2 / S.R.pix_arcsec * 6.15 * s + Math.max(5, s * 0.5), fs = Math.max(12, Math.round(W / 48));
+    const r = 2 / S.R.pix_arcsec * 6.15 * s + Math.max(5, s * 0.5) + 4 * Math.max(6, s * 0.55), fs = Math.max(12, Math.round(W / 48));
     ctx.font = `600 ${fs}px system-ui`;
     const tw = Math.max(...labels.map((l) => ctx.measureText(l[1]).width));
     let lx = cx + r + 6; if (lx + tw > W - 4) lx = cx - r - 6 - tw;
@@ -169,7 +172,7 @@ drawLegend = function () {
   const el = $("legend");
   const extra = catKeys().filter((k) => k !== "gaia" && S.catData[k] && S.catData[k].pos === cat0_posQuery());
   if (!S.showGaia || !extra.length || S.practice) return;
-  const bits = extra.map((k) => `<span style="color:${CAT[k].colour}">${k === "simbad" ? "◇" : "◜"}</span> ${CAT[k].short}`).join(" &nbsp; ");
+  const bits = extra.map((k) => `<span style="color:${CAT[k].colour}">${k === "simbad" ? "◇" : "○"}</span> ${CAT[k].short}`).join(" &nbsp; ");
   if (el.classList.contains("hidden")) { el.classList.remove("hidden"); el.innerHTML = bits; }
   else el.innerHTML += " &nbsp; " + bits;
 };
