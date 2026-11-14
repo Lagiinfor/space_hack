@@ -280,6 +280,98 @@
   <p class="muted small-note">Tried and left out: Proxima Centauri (so bright its measured speed came out about 20% too
     high) and HL Tauri (bright, nebulous and saturated, so its spectrum jumped around unreliably).</p></div>
 
+  <h2 id="fake">Is this fake? How to tell a real object from a camera glitch</h2>
+  <p>Most "new" things you will notice are not real objects. That is normal, and spotting them is a skill. All the
+    pictures below are real SPHEREx data from this tool.</p>
+  <div class="box">
+    <p><b>The golden rule: a real object is in (nearly) every photo.</b> Each frame of the flip-book is a stack of about
+      20 single photos taken over days. Click the object and press <b>📷 Single photos</b> (key <kbd>s</kbd>): the tool
+      plays the single photos behind that spot. A real star or brown dwarf is there every time. A glitch is in one.</p>
+  </div>
+  <h3>Cosmic-ray flash or glint: in one photo only</h3>
+  <p><img src="img/fake_cosmic_ray.png" alt="A flash in one photo, absent in another, removed from the stack" style="max-width:100%;border-radius:10px"></p>
+  <p>A particle hitting the detector, or a glint from a satellite, makes a bright splash in a single photo. The tool
+    throws such one-offs out before stacking. (This is the "blob" found near WISE 0855 during testing.)</p>
+  <h3>Afterimage ("persistence"): the ghost of a bright star photographed just before</h3>
+  <p><img src="img/fake_afterimage.png" alt="An afterimage in one photo, gone in the stack" style="max-width:100%;border-radius:10px"></p>
+  <p>Like the glow you see after looking at a lamp. It appears at the same place on the detector, not the same place
+    on the sky, so it is in one or two photos only. NASA flags it; see <b>More controls → problem flags</b>.</p>
+  <h3>Burnt-out centre of a very bright star</h3>
+  <p><img src="img/fake_saturated.png" alt="A saturated star with a hole in the middle, and the filled version" style="max-width:100%;border-radius:10px"></p>
+  <p>Very bright stars overflow the detector: the centre has no data, and rings or spikes can appear around them.
+    Blinking them often shows "changes" in the difference view that are not real. The tool warns you in the spectrum panel.</p>
+  <h3>For comparison: a real mover</h3>
+  <p><img src="img/real_mover.png" alt="Epsilon Indi B in two passes, shifted relative to the centre lines" style="max-width:100%;border-radius:10px"></p>
+  <p>Epsilon Indi B, 16 months apart. It is in every stacked frame, it shifts steadily in one direction, and its single
+    photos all show it. That is what real looks like.</p>
+  <h3>For comparison: a real asteroid</h3>
+  <p><img src="img/real_asteroid.png" alt="Asteroid Eros in two photos six minutes apart, and absent from the stack" style="max-width:100%;border-radius:10px"></p>
+  <p>An asteroid is real but fast: it is in a few photos taken minutes apart, a little further along each time, and
+    then gone. The tool lists known asteroids for you (☄ panel).</p>
+  <div class="box"><p><b>Quick checklist</b></p><ul>
+    <li>In every stacked frame, and in the single photos? Probably real.</li>
+    <li>In one frame only, or one single photo only? Glitch, afterimage, or a passing asteroid.</li>
+    <li>Right next to a very bright star? Be suspicious.</li>
+    <li>Does it show at more than one infrared colour? Real objects usually do (very cold ones only at 4–5 µm).</li>
+    <li>Still unsure? Report it anyway. A report is a question, not a claim, and mistakes are fine.</li>
+  </ul></div>
+
+  <h2 id="tools">Checking and reporting an object</h2>
+  <ul>
+    <li><b>Click any object.</b> The panel on the right shows its spectrum and, above it, a plain-language reading of
+      <b>what it looks like</b> (ordinary star, cool red star, cold brown dwarf, dusty object), with how sure the tool is
+      and why. It is a rule-of-thumb reading of the spectrum's shape, not a full classification.</li>
+    <li><b>Automatic checks</b> run by themselves: is it in ESA's Gaia star catalogue? does it have a name in the SIMBAD
+      database (fast movers are looked up where they were in the year 2000)? did a known asteroid pass over the spot?
+      does it move, and does the motion match Gaia? <b>Does it have a partner</b>, another star within half a degree
+      moving the same way (try Epsilon Indi B: the tool finds its parent star Epsilon Indi A)?</li>
+    <li><b>📝 Report this object</b> (key <kbd>r</kbd>): type your name (for credit) and a note; the tool saves a report
+      with the position and all the check results into your Downloads folder and the tool's <code>reports</code> folder,
+      or copies it as text for an email. There is no shared reporting server yet, so "already reported" only knows about
+      reports saved on the same computer.</li>
+    <li><b>Open elsewhere:</b> buttons open the same spot in WiseView (15 years of WISE images), the Legacy Survey viewer,
+      SIMBAD and Aladin.</li>
+  </ul>
+
+  <h2 id="picks">The computer's picks</h2>
+  <ul>
+    <li>When you explore a patch freely, the computer searches it in the background but <b>keeps quiet</b>, so you look
+      with fresh eyes first. Press <b>💡 Show the computer's picks</b> (key <kbd>p</kbd>) to compare.</li>
+    <li>Picks are small areas it finds interesting: things that <b>moved</b> (known or unexplained), things that
+      <b>changed brightness</b> in at least three detectors, and <b>unusually red</b> objects (cold or dusty).</li>
+    <li><b>Look</b> inspects one; <b>Go through them one by one</b> shows each in turn for a quick yes/no
+      (keys <kbd>y</kbd> / <kbd>n</kbd>). They are hints, not verdicts.</li>
+    <li>On the guided tour the picks are shown from the start, because those stops are demonstrations.</li>
+  </ul>
+
+  <h2 id="practice">Practice mode</h2>
+  <p>On the first screen, <b>🎯 Practice</b> gives five quick rounds on patches where the answer is known. Watch the
+    flip-book, click what moves (or press "Nothing moves here"), and get instant feedback. Some patches have no mover:
+    knowing when nothing is there matters just as much.</p>
+
+  <h2 id="older">Older photos from other telescopes</h2>
+  <ul>
+    <li><b>🛰 Older photos (2010 →)</b> adds frames from other telescopes to the timeline (dashed buttons), to follow
+      positions over many more years: NASA's <b>WISE</b> from 2010 (every patch), and Canada's <b>NEOSSat</b> wherever it
+      photographed the spot (a few percent of the sky; the "This patch" panel says "Canada's NEOSSat also looked here").</li>
+    <li>They are <b>different telescopes</b> (different wavelengths and sharpness), so they are only shown in the plain
+      "Photos" view and never used in "Changes only" or any brightness comparison.</li>
+    <li>NEOSSat's archive photos carry no precise sky coordinates. The tool works them out by matching the stars in each
+      photo to the Gaia catalogue, then stacks the aligned photos.</li>
+    <li>Try <b>Barnard's Star</b>: WISE 2010 → NEOSSat 2019 → SPHEREx 2025–26, the star marching north for 16 years with
+      Gaia's predicted circle following it.</li>
+  </ul>
+  <p class="muted small-note">NEOSSat is a mission of the <b>Canadian Space Agency</b>; its images are served by the
+    <b>Canadian Astronomy Data Centre</b> (CADC), operated by the National Research Council of Canada with the support of
+    the Canadian Space Agency. WISE/AllWISE images: NASA/IPAC Infrared Science Archive.</p>
+
+  <h2 id="keys">Keyboard shortcuts</h2>
+  <p><kbd>space</kbd> play/pause · <kbd>←</kbd> <kbd>→</kbd> previous/next frame · <kbd>d</kbd> changes-only view ·
+    <kbd>i</kbd> inverted colours · <kbd>+</kbd> <kbd>-</kbd> zoom (on the spot you last clicked) · <kbd>g</kbd> Gaia stars ·
+    <kbd>p</kbd> computer's picks · <kbd>s</kbd> single photos of the clicked spot · <kbd>r</kbd> report ·
+    <kbd>Esc</kbd> leave single photos / reset zoom. Under <b>More controls</b>: zoom, inverted colours,
+    "tame bright stars", speed ×0.25–×2.</p>
+
   <h2 id="asteroids">Asteroids, comets and NASA's impact-risk information</h2>
   <ul>
     <li>For every patch, the tool asks the IMCCE <b>SkyBoT</b> service which known asteroids and comets were inside the

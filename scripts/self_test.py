@@ -121,5 +121,39 @@ if have(76.9566, 30.4013):
 else:
     print("skip  RW Aurigae not downloaded")
 
+# ------------------------------------------------------------ 5. volunteer tools (real data)
+from spx import objcheck  # noqa: E402
+
+if have(331.097, -56.8008):
+    sp = analysis.spectrum(331.097, -56.8008, 0.06, 331.097, -56.8008)
+    w = objcheck.what_is_it(sp)
+    check("Epsilon Indi B's spectrum is read as a cold brown dwarf", "brown dwarf" in w["label"], w["label"])
+    try:
+        c = objcheck.checks(331.097, -56.8008, 0.06, 331.097, -56.8008, spec=sp, movers=analysis.movers(331.097, -56.8008, 0.06))
+        pr = c["partner"].get("partners", [])
+        check("Epsilon Indi B: partner star found (Epsilon Indi A, moving the same way)", bool(pr) and pr[0]["g"] < 6,
+              str(pr[:1]))
+    except Exception as e:
+        print("skip  partner check (catalogue not reachable):", e)
+
+if have(269.4464, 4.7686):
+    w = objcheck.what_is_it(analysis.spectrum(269.4464, 4.7686, 0.06, 269.44387, 4.79629))
+    check("ordinary field star is read as an ordinary star", "ordinary star" in w["label"], w["label"])
+
+if have(76.9566, 30.4013):
+    pk = analysis.picks(76.9566, 30.4013, 0.06)["picks"]
+    check("computer's picks: RW Aurigae flagged as 'changed brightness', not as a mover",
+          any(o["kind"] == "changed" for o in pk) and not any(o["kind"] == "mover" for o in pk),
+          ", ".join(o["kind"] for o in pk))
+
+if have(85.467, -4.852) or True:
+    # a quiet field must give no picks (no false alarms)
+    try:
+        pk = analysis.picks(260.6592, -23.8261, 0.06)["picks"] if have(260.6592, -23.8261) else None
+        if pk is not None:
+            check("computer's picks: quiet field (Barnard 68) gives no false alarms", len(pk) == 0, f"{len(pk)} picks")
+    except Exception as e:
+        print("skip  quiet-field check:", e)
+
 print("\n" + ("ALL CHECKS PASSED" if not failures else f"{len(failures)} CHECK(S) FAILED: " + "; ".join(failures)))
 sys.exit(1 if failures else 0)

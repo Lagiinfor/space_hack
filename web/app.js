@@ -22,7 +22,7 @@ const S = {
   mode: "flip",       // "flip" or "lens"
   band: 0, frameIdx: 0, playing: true, timer: null,
   view: "normal", blinkset: "all",
-  cross: true, gaia: null, showGaia: false, movers: null, showMovers: true,
+  cross: true, gaia: null, showGaia: false, movers: null, showMovers: false,
   flags: null, flagLayer: "",
   lenses: [], lensKey: "methane", lensPass: "all", lensData: null,
   click: null, spec: null, logy: false,
@@ -103,6 +103,7 @@ async function go(q) {
   q = (q ?? $("where").value).trim();
   if (!q) return;
   S.wantOther = false;
+  S.showPicks = S.showMovers = false;     // free exploring: look first, reveal the computer's picks later
   $("where").value = q;
   $("error").textContent = "";
   $("resolved").textContent = "";
@@ -215,6 +216,7 @@ async function loadOther() {
 }
 
 function afterFinal() {
+  if (typeof loadPicks === "function") loadPicks();
   loadOther();
   if (S.showGaia) loadGaia();
   loadMovers();
@@ -252,7 +254,7 @@ function setup(keepBand) {
   if (R.preview) {
     S.mode = "flip";
     $("moverpanel").classList.remove("hidden");
-    $("moverlist").textContent = "The automatic search for moving objects runs as soon as all photos are in.";
+    $("moverlist").textContent = "The computer's own search runs as soon as all photos are in.";
   } else afterFinal();
   if (S.mode === "lens") setMode("lens"); else setMode("flip");
   play(true);
@@ -331,7 +333,7 @@ function refresh() {
   });
   $("cross").classList.toggle("on", S.cross);
   $("gaiaBtn").classList.toggle("on", S.showGaia);
-  $("moversBtn").classList.toggle("on", S.showMovers);
+  $("moversBtn").classList.toggle("on", !!S.showPicks);
   $("otherBtn").classList.toggle("on", !!S.showOther);
   $("play").textContent = S.playing ? "❚❚" : "▶";
   for (const b of $("viewseg").children) b.classList.toggle("on", b.dataset.view === S.view || (S.view === "first" && b.dataset.view === "diff"));
@@ -351,8 +353,9 @@ const off = document.createElement("canvas");
 function stretchParams(frames) {
   const peak = Math.max(...frames.map((g) => g.peak));
   const noise = frames[0].noise;
-  const vmax = peak * Math.pow(10, -3 * $("bright").value / 100);
+  let vmax = peak * Math.pow(10, -3 * $("bright").value / 100);
   const soft = noise * Math.pow(10, 2 - 3 * $("soft").value / 100);
+  if (S.tame) vmax = Math.max(vmax, 400 * noise);   // "tame the bright stars": keep their shapes, don't let them flood
   return { vmax, soft };
 }
 
@@ -363,11 +366,17 @@ function drawOtherFrame(px, n, f) {
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const src = (n - 1 - y) * n + x, o = (y * n + x) * 4, v = f.arr[src];
     if (!Number.isFinite(v)) { const h = ((x + y) % 6 < 3) ? 34 : 26; px[o] = h; px[o + 1] = h + 2; px[o + 2] = h + 10; }
-    else { const c = 255 * Math.max(0, Math.min(1, Math.asinh(v / soft) / norm)); px[o] = c * 0.92; px[o + 1] = c * 0.96; px[o + 2] = c; }
+    else { const c = tone(Math.asinh(v / soft) / norm); px[o] = c * 0.92; px[o + 1] = c * 0.96; px[o + 2] = c; }
     px[o + 3] = 255;
   }
   const wl = f.source === "WISE" ? `infrared, ${f.wl} µm` : "visible light";
   return [`${f.date_text} · ${f.source}`, `${wl} · a different telescope: compare positions, not brightness`];
+}
+
+// grey level 0..255 from a 0..1 brightness; "inverted colours" shows stars black on white
+function tone(v) {
+  v = Math.max(0, Math.min(1, v));
+  return 255 * (S.invert ? 1 - v : v);
 }
 
 function boxSmooth(a, n) {
@@ -470,7 +479,7 @@ function draw() {
         if (v >= 0) { px[o] = 30 + 225 * a; px[o + 1] = 30 + 60 * a; px[o + 2] = 30 + 40 * a; }
         else { px[o] = 30 + 30 * a; px[o + 1] = 30 + 110 * a; px[o + 2] = 30 + 225 * a; }
       } else {
-        const c = 255 * Math.max(0, Math.min(1, Math.asinh(data[src] / soft) / norm));
+        const c = tone(Math.asinh(data[src] / soft) / norm);
         px[o] = c; px[o + 1] = c; px[o + 2] = c;
       }
       px[o + 3] = 255;
@@ -512,6 +521,7 @@ function draw() {
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(off, 0, 0, cv.width, cv.height);
   drawOverlays(ctx, s);
+  if (typeof drawPicks === "function") drawPicks(ctx, s);
   $("olabel").textContent = label;
   $("osub").textContent = sub;
   drawLegend();
@@ -732,25 +742,14 @@ async function loadFlags() {
 }
 
 async function loadMovers() {
-  $("moverpanel").classList.remove("hidden");
-  $("moverlist").textContent = "Searching all passes for anything that moved...";
+  // the list is shown by the "computer's picks" panel (tools.js); here we only fetch it
   const key = `${S.R.ra},${S.R.dec}`;
   try {
     const M = await api(`/api/movers?${posQuery()}`);
     if (!S.R || `${S.R.ra},${S.R.dec}` !== key) return;
     S.movers = M;
-    const dir = (m) => (m.rate_north > 0 ? "north" : "south") + "-" + (m.rate_east > 0 ? "east" : "west");
-    const bandTxt = (b) => b === 0 ? "all bands" : b === 6 ? "4.4–5.0 µm" : "3.8–4.4 µm";
-    $("moverlist").innerHTML = M.movers.length
-      ? "<ul>" + M.movers.map((m) => `<li><b style="color:${m.status.startsWith("candidate") ? "#ff7b72" : "#56d4dd"}">` +
-          `${m.status.split(":")[0].toUpperCase()}</b>: ${m.rate.toFixed(1)}″/yr to the ${dir(m)}, ` +
-          `${m.track[0][0].toFixed(0)}″ E ${m.track[0][1].toFixed(0)}″ N of centre (seen in ${bandTxt(m.band)}, ` +
-          `${m.sigma.toFixed(0)}× the field's position noise). ${m.status.split(":")[1] || ""}</li>`).join("") + "</ul>"
-      : "No moving objects found by this search (objects bright enough to detect in the stacked pictures, " +
-        "moving steadily by more than about 1.5″ between passes and up to 12″ per year). Fainter or much faster " +
-        "objects, such as asteroids, would not be caught.";
     draw();
-  } catch (e) { $("moverlist").textContent = "Mover search failed: " + e.message; }
+  } catch (e) { /* the picks panel reports problems */ }
 }
 
 // ------------------------------------------------------------------ spectrum
@@ -776,6 +775,7 @@ function snapToStar(cx, cy) {
 
 async function clickSpectrum(e) {
   if (!S.R) return;
+  if (typeof practiceClick === "function" && practiceClick(e)) return;
   if (S.R.preview) { $("hover").textContent = "Spectra open as soon as all photos are downloaded (see the bar at the top of the picture)."; return; }
   const r = e.target.getBoundingClientRect();
   const n = S.R.size;
@@ -795,6 +795,7 @@ async function clickSpectrum(e) {
     S.spec = sp;
     plotSpectrum();
     draw();
+    if (typeof afterSpectrum === "function") afterSpectrum(sp, sky);
   } catch (e2) { $("specinfo").textContent = "Could not measure here: " + e2.message; }
 }
 
@@ -933,6 +934,7 @@ async function startTour(t) {
   S.tourKey = t.key;
   S.band = t.band; S.mode = "flip"; S.view = "normal"; $("view").value = "normal";
   S.wantOther = !!t.other;
+  S.showPicks = S.showMovers = true;      // tour stops are demos: show what the computer found
   const field = parseFloat($("field").value) || t.field;   // keep the size the person picked on the card
   history.replaceState(null, "", "?");
   try {
@@ -964,7 +966,7 @@ function wire() {
   $("view").onchange = () => { S.view = $("view").value; refresh(); };
   $("blinkset").onchange = () => { S.blinkset = $("blinkset").value; S.frameIdx = 0; refresh(); };
   $("cross").onclick = () => { S.cross = !S.cross; refresh(); };
-  $("moversBtn").onclick = () => { S.showMovers = !S.showMovers; refresh(); };
+  $("moversBtn").onclick = () => togglePicks();
   $("otherBtn").onclick = () => {
     S.showOther = !S.showOther; S.frameIdx = 0;
     if (S.showOther && S.view !== "normal") { S.view = "normal"; $("view").value = "normal"; }

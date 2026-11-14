@@ -56,7 +56,7 @@ $("pcgo").onclick = async () => {
   document.body.classList.add("warp");
   setTimeout(() => document.body.classList.remove("warp"), 900);
   if (target && target.key) startTour(target);
-  else { S.tourKey = null; load(ra, dec, parseFloat($("field").value)).catch((e) => fail(e.message)); }
+  else { S.tourKey = null; S.wantOther = false; S.showPicks = S.showMovers = false; load(ra, dec, parseFloat($("field").value)).catch((e) => fail(e.message)); }
 };
 
 window.addEventListener("tour-loaded", (e) => {

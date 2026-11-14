@@ -28,3 +28,5 @@ data/*
 !data/ra29.0314_dec+28.7635/
 # raw NEOSSat downloads (the stacked result is kept)
 data/*/neossat/
+# reports saved by people using the tool on this computer
+reports/

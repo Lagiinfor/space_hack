@@ -6,12 +6,13 @@
 <title>SPHEREx Sky Flip-book</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=50">
+<link rel="stylesheet" href="style.css?v=60">
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
 <script src="vendor/plotly.min.js" defer></script>
-<script src="app.js?v=50" defer></script>
-<script src="asteroids.js?v=50" defer></script>
-<script type="module" src="picker.js?v=31"></script>
+<script src="app.js?v=60" defer></script>
+<script src="asteroids.js?v=60" defer></script>
+<script src="tools.js?v=61" defer></script>
+<script type="module" src="picker.js?v=60"></script>
 </head>
 <body class="on-pick">
 
@@ -47,6 +48,7 @@
     </details>
     <div class="resolved" id="resolved"></div>
     <div class="error" id="error"></div>
+    <button id="practiceBtn" class="practice-start" title="Five quick rounds on patches with known answers">🎯 Practice: can you spot the mover?</button>
   </div>
 
   <div class="hover-read" id="skyhover"></div>
@@ -143,7 +145,7 @@
 
           <div class="ctl-label">On the picture</div>
           <div class="row wrap">
-            <button id="moversBtn" class="chip on" title="Arrows on everything the automatic search found moving">➜ Movers</button>
+            <button id="moversBtn" class="chip" title="Show or hide what the computer found interesting in this patch (key: p)">💡 Computer's picks</button>
             <button id="otherBtn" class="chip" disabled title="Add older photos of this spot from other telescopes (NASA's WISE in 2010, Canada's NEOSSat where it looked) to the timeline. Different telescopes: for comparing positions over many years, not brightness.">🛰 Older photos (2010 →)</button>
             <button id="astBtn" class="chip on" title="Known asteroids and comets that passed through this patch">☄ Asteroids</button>
             <button id="gaiaBtn" class="chip" title="Circles where ESA's Gaia catalogue predicts each star on this date">◯ Gaia stars</button>
@@ -168,6 +170,13 @@
             </select></div>
           <div class="row slider"><span>Brightness</span><input type="range" id="bright" min="0" max="100" value="35"></div>
           <div class="row slider"><span>Faint stars</span><input type="range" id="soft" min="0" max="100" value="40"></div>
+          <div class="row wrap">
+            <button id="zoomout" title="Zoom out (key: -)">－</button>
+            <span class="muted" id="zoomtxt">Zoom ×1</span>
+            <button id="zoomin" title="Zoom in on the spot you last clicked (key: +)">＋</button>
+            <button id="invertBtn" class="chip" title="Black stars on a white sky: faint things are often easier to see (key: i)">◐ Inverted colours</button>
+            <button id="tameBtn" class="chip" title="Stop very bright stars from flooding the picture">☀ Tame bright stars</button>
+          </div>
           <div class="row wrap">
             <select id="view" title="What each frame shows">
               <option value="normal">Photos</option>
@@ -195,6 +204,13 @@
 
     <!-- the side column -->
     <aside class="side">
+      <div class="card hidden" id="practicepanel">
+        <div class="card-kind">Practice</div>
+        <h2 id="practitle"></h2>
+        <p id="practext" class="tourstory"></p>
+        <div class="row wrap" id="pracbtns" style="margin-top:10px"></div>
+      </div>
+
       <div class="card hidden" id="tourpanel">
         <div class="card-kind" id="tourkind"></div>
         <h2 id="tourname"></h2>
@@ -209,20 +225,34 @@
             <button id="specclose" class="small-btn">✕</button>
           </div>
         </div>
+        <div class="whatis hidden" id="whatis"></div>
         <div class="muted" id="specinfo"></div>
         <div id="specplot"></div>
         <div class="warn hidden" id="specwarn"></div>
+        <div id="objchecks" class="objchecks"></div>
+        <div class="row wrap objtools">
+          <button class="small-btn" id="objphotos" title="Play the single photos behind this spot: a real object is in every one">📷 Single photos</button>
+          <button class="small-btn" id="objreport">📝 Report this object</button>
+          <a class="small-btn linkbtn" id="lnWise" target="_blank" rel="noopener">WiseView ↗</a>
+          <a class="small-btn linkbtn" id="lnLegacy" target="_blank" rel="noopener">Legacy Survey ↗</a>
+          <a class="small-btn linkbtn" id="lnSimbad" target="_blank" rel="noopener">SIMBAD ↗</a>
+          <a class="small-btn linkbtn" id="lnAladin" target="_blank" rel="noopener">Aladin ↗</a>
+          <a class="small-btn linkbtn" href="guide.html#fake" target="_blank">Is this fake? ↗</a>
+        </div>
+        <div id="reportbox" class="reportbox hidden"></div>
         <p class="muted small-note">This is the object's <b>spectrum</b>: its brightness at each infrared colour. Each dot is one
           SPHEREx photo; each line is one sky pass. Dips in the shaded strips mean molecules (methane, water ice, CO₂, CO) are
           absorbing light. If the lines don't match, the object changed.</p>
       </div>
 
       <div class="card hidden" id="moverpanel">
-        <h2>➜ Things that moved</h2>
+        <h2>💡 Computer's picks</h2>
         <div id="moverlist" class="muted"></div>
-        <p class="muted small-note">Found automatically: every dot is tracked across the sky passes, and anything that moved
-          steadily is checked against ESA's Gaia catalogue. <b>Known</b> = Gaia predicts it. <b>Candidate</b> = nothing
-          explains it, so it is worth a closer look.</p>
+        <div id="pickquick" class="hidden"></div>
+        <p class="muted small-note">The computer tracks every dot across the sky passes and points out small areas it finds
+          interesting: things that <b>moved</b> (checked against ESA's Gaia catalogue: <b>known</b> = Gaia predicts it,
+          <b>unexplained</b> = worth a closer look), things that <b>changed brightness</b>, and <b>unusually red</b>
+          objects. They are hints, not verdicts: your eyes decide.</p>
       </div>
 
       <div class="card hidden" id="astpanel">

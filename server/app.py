@@ -149,7 +149,13 @@ def _ready(ra, dec, field):
 @app.get("/api/spectrum")
 def spectrum(ra0: float, dec0: float, field: float, ra: float, dec: float):
     _ready(ra0, dec0, field)
-    return analysis.spectrum(ra0, dec0, field, ra, dec)
+    sp = analysis.spectrum(ra0, dec0, field, ra, dec)
+    try:
+        from spx import objcheck
+        sp["what"] = objcheck.what_is_it(sp)
+    except Exception:
+        pass
+    return sp
 
 
 @app.get("/api/lenses")
@@ -194,6 +200,36 @@ def photo(ra0: float, dec0: float, field: float, obs_id: str, detector: int):
         return analysis.single_photo(ra0, dec0, field, obs_id, detector)
     except KeyError:
         raise HTTPException(404, "That photo is not in this patch.")
+
+
+@app.get("/api/picks")
+def picks(ra0: float, dec0: float, field: float):
+    """Small areas the computer finds interesting (movers, brightness changes, very red objects)."""
+    _ready(ra0, dec0, field)
+    return analysis.picks(ra0, dec0, field)
+
+
+@app.get("/api/inspect")
+def inspect_object(ra0: float, dec0: float, field: float, ra: float, dec: float):
+    """All automatic checks for one clicked object (see spx/objcheck.py)."""
+    _ready(ra0, dec0, field)
+    from spx import objcheck
+    spec = analysis.spectrum(ra0, dec0, field, ra, dec)
+    try:
+        mv = analysis.movers(ra0, dec0, field)
+    except Exception:
+        mv = None
+    out = objcheck.checks(ra0, dec0, field, ra, dec, spec=spec, movers=mv)
+    out["what"] = objcheck.what_is_it(spec)
+    return out
+
+
+@app.post("/api/report")
+async def report(request: Request):
+    """Save a volunteer's report as a file on this computer."""
+    from spx import objcheck
+    body = await request.json()
+    return objcheck.save_report(body)
 
 
 @app.get("/api/other")

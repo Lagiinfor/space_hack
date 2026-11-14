@@ -160,7 +160,7 @@ function drawPhotoView(px, n) {
     const src = (n - 1 - y) * n + x, o = (y * n + x) * 4;
     const v = P.arr[src];
     if (!Number.isFinite(v)) { const h = ((x + y) % 6 < 3) ? 34 : 26; px[o] = h; px[o + 1] = h + 2; px[o + 2] = h + 10; }
-    else { const c = 255 * Math.max(0, Math.min(1, Math.asinh(v / soft) / norm)); px[o] = c; px[o + 1] = c; px[o + 2] = c; }
+    else { const c = tone(Math.asinh(v / soft) / norm); px[o] = c; px[o + 1] = c; px[o + 2] = c; }
     px[o + 3] = 255;
   }
   return [`Single photo · ${mjdToText(P.mjd)}`,

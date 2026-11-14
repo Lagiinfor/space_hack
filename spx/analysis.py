@@ -524,3 +524,127 @@ def other_frames(ra0: float, dec0: float, field_deg: float) -> dict:
     res = dict(frames=sorted(out, key=lambda f: f["mjd"]), **notes)
     cache.write_text(json.dumps(res))
     return res
+
+
+# ---------------------------------------------------------------- the computer's picks
+def picks(ra0: float, dec0: float, field_deg: float) -> dict:
+    """Small areas the computer finds interesting, for the person to judge:
+    - movers: from the automatic mover search (with the Gaia verdict);
+    - changed: sources whose brightness changed between the first and last good pass,
+      the same way in at least three detectors (so one odd detector cannot fake it);
+    - red: sources far brighter at 4-5 um than ordinary stars of this field (cold or dusty).
+    These are hints, not verdicts."""
+    import base64
+    from . import movers as mv
+
+    pos = load_position(ra0, dec0, field_deg)
+    res = pos["result"]
+    grid, shape = frames.target_grid(pos["ra"], pos["dec"], field_deg)
+    n = shape[0]
+    pix = res["pix_arcsec"]
+    img = {}
+    for f in res["frames"]:
+        img[(f["band"], f["pass_index"])] = (np.frombuffer(base64.b64decode(f["pixels"]), dtype="<f4").reshape(shape).astype(float),
+                                             f["noise"], f["n"], bool(f.get("limited")))
+    def en(x, y):
+        return float(-(x - n / 2 + 0.5) * pix), float((y - n / 2 + 0.5) * pix)
+
+    def box(a, x, y, h=2):
+        xi, yi = int(round(x)), int(round(y))
+        if not (h <= xi < n - h and h <= yi < n - h):
+            return np.nan
+        c = a[yi - h:yi + h + 1, xi - h:xi + h + 1]
+        return float(np.nansum(c)) if np.isfinite(c).mean() > 0.8 else np.nan
+
+    out = []
+    try:
+        m = movers(ra0, dec0, field_deg)
+    except Exception:
+        m = dict(movers=[])
+    for x in m["movers"]:
+        cand = x["status"].startswith("candidate")
+        out.append(dict(kind="mover", east=x["track"][0][0], north=x["track"][0][1], track=x["track"],
+                        rate=x["rate"], rate_east=x["rate_east"], rate_north=x["rate_north"], status=x["status"],
+                        title=("Unexplained mover" if cand else "Known mover"),
+                        why=f"Moved steadily between passes, about {x['rate']:.1f}″ per year. " +
+                            ("Nothing in the Gaia catalogue explains it." if cand else "The Gaia catalogue predicts this motion."),
+                        score=100 + x["sigma"]))
+    mover_spots = [t for x in m["movers"] for t in x["track"]]
+    near_mover = lambda e, nn: any(np.hypot(e - t[0], nn - t[1]) < 12 for t in mover_spots)  # noqa: E731
+
+    # sources in the deepest picture (all passes, all colours)
+    all0 = [v for (b, k), v in img.items() if b == 0 and v[2] >= 6]
+    if all0:
+        with np.errstate(all="ignore"):
+            deep = np.nanmean([v[0] for v in all0], axis=0)
+        srcs = mv.find_sources(np.nan_to_num(deep), grid, min_snr=8.0)
+    else:
+        srcs = []
+
+    # ---- changed brightness
+    passes_ok = sorted({k for (b, k), v in img.items() if b == 0 and v[2] >= 24})
+    if len(passes_ok) >= 2:
+        k0, k1 = passes_ok[0], passes_ok[-1]
+        for s in srcs:
+            e, nn = en(s["x"], s["y"])
+            if near_mover(e, nn):
+                continue
+            votes, ratios = 0, []
+            for b in range(1, 7):
+                if (b, k0) not in img or (b, k1) not in img:
+                    continue
+                a0, n0, c0, l0 = img[(b, k0)]; a1, n1, c1, l1 = img[(b, k1)]
+                if l0 or l1 or c0 < 6 or c1 < 6:
+                    continue
+                f0, f1 = box(a0, s["x"], s["y"]), box(a1, s["x"], s["y"])
+                sig = 5 * max(n0, n1)
+                if not np.isfinite([f0, f1]).all() or min(f0, f1) < 8 * sig:
+                    continue
+                r = f1 / f0
+                ratios.append(r)
+            if len(ratios) >= 3:
+                up = sum(r > 1.3 for r in ratios); down = sum(r < 0.77 for r in ratios)
+                if max(up, down) >= 3 and not any(o["kind"] == "changed" and np.hypot(o["east"] - e, o["north"] - nn) < 15 for o in out):
+                    med = float(np.median([r for r in ratios if (r > 1.3 if up >= down else r < 0.77)]))
+                    word = f"{(med - 1) * 100:.0f}% brighter" if med > 1 else f"{(1 - med) * 100:.0f}% fainter"
+                    out.append(dict(kind="changed", east=e, north=nn, title="Changed brightness",
+                                    why=f"About {word} in {res['passes'][k1]['label']} than in {res['passes'][k0]['label']}, "
+                                        f"in {max(up, down)} of {len(ratios)} detectors. Very bright stars can show smaller "
+                                        "false changes, so check its spectrum.",
+                                    score=50 + 20 * abs(np.log(med))))
+
+    # ---- unusually red (cold or dusty)
+    def avg_band(b):
+        v = [x[0] for (bb, k), x in img.items() if bb == b and x[2] >= 6]
+        if not v:
+            return None, None
+        with np.errstate(all="ignore"):
+            return np.nanmean(v, axis=0), float(np.mean([x[1] for (bb, k), x in img.items() if bb == b and x[2] >= 6])) / np.sqrt(len(v))
+    b3, n3 = avg_band(3)
+    longs = [(b,) + avg_band(b) for b in (5, 6)]
+    if b3 is not None:
+        for b, bl, nl in longs:
+            if bl is None:
+                continue
+            red_srcs = mv.find_sources(np.nan_to_num(bl), grid, min_snr=7.0)
+            rat = []
+            for s in red_srcs:
+                fl, fs = box(bl, s["x"], s["y"]), box(b3, s["x"], s["y"])
+                if np.isfinite([fl, fs]).all() and fs > 8 * 5 * n3 and fl > 0:
+                    rat.append(fl / fs)
+            typical = float(np.median(rat)) if len(rat) >= 4 else 0.25
+            for s in red_srcs:
+                e, nn = en(s["x"], s["y"])
+                fl, fs = box(bl, s["x"], s["y"]), box(b3, s["x"], s["y"])
+                if not np.isfinite([fl, fs]).all() or fl < 8 * 5 * nl:
+                    continue
+                r = fl / max(fs, 3 * 5 * n3)
+                if r > 4 * typical and not any(o["kind"] == "red" and np.hypot(o["east"] - e, o["north"] - nn) < 10 for o in out):
+                    out.append(dict(kind="red", east=e, north=nn, title="Unusually red",
+                                    why=f"About {r / typical:.0f} times brighter at 4–5 µm, compared with 2 µm, than typical "
+                                        "stars here. Cold brown dwarfs and dusty stars look like this.",
+                                    score=30 + min(20, r / typical)))
+    out.sort(key=lambda o: -o["score"])
+    for i, o in enumerate(out[:12]):
+        o["n"] = i + 1
+    return dict(picks=out[:12], n_sources=len(srcs))

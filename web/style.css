@@ -237,3 +237,33 @@ body.flying .pick-panel, body.flying .guide-btn.floating, body.flying .hover-rea
 .pass-chip.other { border-style: dashed; color: #c9d4ee; }
 .pass-chip.other small { color: #9aa7c7; }
 button:disabled { opacity: .45; cursor: default; }
+
+/* ---------- volunteer tools ---------- */
+.whatis { background: rgba(108,196,255,0.08); border: 1px solid var(--line2); border-radius: 10px; padding: 8px 12px; margin: 4px 0 8px; font-size: 14.5px; }
+.whatis .conf { color: var(--muted); font-size: 12.5px; }
+.whatis details { margin-top: 4px; font-size: 12.5px; color: #c6d1ea; }
+.whatis ul { margin: 4px 0 0; padding-left: 18px; }
+.objchecks { margin-top: 6px; }
+.verdict { border-radius: 10px; padding: 8px 12px; font-size: 13.5px; margin-bottom: 6px; }
+.verdict.new { background: rgba(255,200,87,0.1); border: 1px solid rgba(255,200,87,0.5); color: #ffe2a6; }
+.verdict.known { background: rgba(79,209,139,0.08); border: 1px solid rgba(79,209,139,0.4); color: #bfeed2; }
+ul.checks { list-style: none; padding: 0; margin: 0; }
+ul.checks li { display: flex; gap: 8px; font-size: 13px; color: #c6d1ea; padding: 3px 0; }
+ul.checks li span { flex: none; width: 16px; text-align: center; }
+ul.checks li.known span { color: var(--good); } ul.checks li.new span { color: var(--gold); } ul.checks li.warn span { color: var(--warn); }
+.objtools { margin-top: 10px; }
+.linkbtn { text-decoration: none; color: var(--text); border: 1px solid var(--line2); border-radius: 10px; background: rgba(255,255,255,0.05); }
+.linkbtn:hover { border-color: var(--accent); }
+.reportbox { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 4px; }
+.reportbox textarea { width: 100%; margin: 8px 0; background: rgba(0,0,0,0.35); border: 1px solid var(--line2); border-radius: 10px; color: var(--text); font: inherit; padding: 8px 10px; }
+ol.picks { list-style: none; padding: 0; margin: 0 0 8px; }
+ol.picks li { display: flex; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); color: #c6d1ea; font-size: 13.5px; }
+ol.picks li:first-child { border-top: 0; }
+.pk { flex: none; width: 22px; height: 22px; border-radius: 50%; color: #06101f; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; margin-top: 2px; }
+.quick { background: rgba(255,255,255,0.04); border: 1px solid var(--line2); border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: 13.5px; color: #dbe5fb; }
+.practice-start { width: 100%; margin-top: 12px; border-color: rgba(255,200,87,0.5); color: #ffe2a6; }
+#practicepanel { border-color: rgba(255,200,87,0.5); }
+body.practising #info, body.practising #astpanel, body.practising #moverpanel, body.practising #tourpanel,
+body.practising #specpanel, body.practising .where-now, body.practising #moversBtn, body.practising #gaiaBtn,
+body.practising #astBtn, body.practising #otherBtn, body.practising #tab-lens, body.practising .stepper { display: none !important; }
+canvas#sky { transition: transform .25s ease; }
