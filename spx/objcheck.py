@@ -314,7 +314,9 @@ def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None, cats="gaia") -
                          and abs(pm - motion["rate"]) > max(1.0, 0.5 * motion["rate"]))
             out["gaia"] = dict(found=not other, background_star=other, sep_arcsec=round(best[0], 1),
                                g=round(s["g"], 1), id=s["id"], pm=round(pm, 3), pmra=s["pmra"], pmdec=s["pmdec"],
-                               distance_ly=round(dist) if dist else None)
+                               distance_ly=round(dist) if dist else None,
+                               parallax=round(float(s["parallax"]), 2) if s.get("parallax") is not None else None,
+                               ra=round(float(s["ra"]), 6), dec=round(float(s["dec"]), 6), epoch=2016.0)
         else:
             out["gaia"] = dict(found=False, nearest_arcsec=round(best[0], 1) if best else None)
     except LookupError:

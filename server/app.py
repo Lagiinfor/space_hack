@@ -164,11 +164,31 @@ def lenses():
 
 
 @app.get("/api/lens")
-def lens(ra0: float, dec0: float, field: float, key: str, pass_index: int | None = None):
+def lens(ra0: float, dec0: float, field: float, key: str, pass_index: int | None = None, win: str = ""):
     _ready(ra0, dec0, field)
+    if key == "custom":
+        # win = "lo-hi,lo-hi,lo-hi" in microns: red, green, blue
+        try:
+            windows = [tuple(float(x) for x in part.split("-")) for part in win.split(",")]
+            assert len(windows) == 3 and all(len(w) == 2 and 0.7 <= w[0] < w[1] <= 5.1 for w in windows)
+        except Exception:
+            raise HTTPException(400, "Give three wavelength ranges between 0.75 and 5.0 microns, each from low to high.")
+        return analysis.lens(ra0, dec0, field, key, pass_index, windows=windows)
     if key not in analysis.LENSES:
         raise HTTPException(404, "Unknown lens")
     return analysis.lens(ra0, dec0, field, key, pass_index)
+
+
+@app.get("/api/images")
+def images(ra0: float, dec0: float, field: float):
+    """Where each photo of this patch lives in NASA's archive (the original full file)."""
+    _ready(ra0, dec0, field)
+    p = flipbook.place_dir(round(ra0, 4), round(dec0, 4)) / "images.json"
+    if not p.exists():
+        return []
+    import json as _json
+    return [dict(obs_id=i["obs_id"], detector=i["detector"], url=i["url"], collection=i.get("collection"))
+            for i in _json.loads(p.read_text())]
 
 
 @app.get("/api/flags")

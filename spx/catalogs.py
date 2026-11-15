@@ -424,6 +424,7 @@ def check_point(ra0, dec0, field_deg, ra, dec, jyear, keys, motion=None) -> list
         if hit:
             sep, s, how = hit
             row.update(found=True, source=s["name"], year=round(s["epoch"]), how=how,
+                       ra=round(float(s["ra"]), 6), dec=round(float(s["dec"]), 6), epoch=round(float(s["epoch"]), 1),
                        sep_arcsec=round(sep, 1) if sep is not None else None)
             if s.get("mag") is not None:
                 row.update(mag=round(s["mag"], 1), band=s.get("band", ""))

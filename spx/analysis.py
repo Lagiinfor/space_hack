@@ -116,6 +116,22 @@ def _load(ra, dec, field_deg, key):
 
 
 # ---------------------------------------------------------------- spectrum
+def _flag_groups(c: frames.Cutout, ra: float, dec: float, r_ap: float = 2.0) -> list:
+    """Which kinds of problem NASA's pipeline flagged inside the measuring circle of one photo
+    (names from FLAG_GROUPS). Read straight from the photo's FLAGS layer; nothing is inferred."""
+    try:
+        x0, y0 = c.wcs.all_world2pix(ra, dec, 0)
+        ny, nx = c.flags.shape
+        yy, xx = np.mgrid[:ny, :nx]
+        inside = np.hypot(xx - x0, yy - y0) <= r_ap
+        if not inside.any():
+            return []
+        bits = int(np.bitwise_or.reduce(c.flags[inside].astype(np.int64)))
+    except Exception:
+        return []
+    return [name for name, keys in FLAG_GROUPS.items() if bits & sum(frames.FLAG_BITS[k] for k in keys)]
+
+
 def _aperture_flux(c: frames.Cutout, ra: float, dec: float, r_ap: float = 2.0,
                    r_in: float = 4.0, r_out: float = 7.0):
     """Sum the light within r_ap pixels of (ra, dec) minus the local background
@@ -248,7 +264,9 @@ def spectrum(ra0: float, dec0: float, field_deg: float, ra: float, dec: float, f
         if not isinstance(m, tuple) or not np.isfinite(m[0]):
             continue
         pts.append(dict(wl=round(c.wavelength_at(r_, d_), 4), flux=m[0], err=m[1], band=c.detector,
-                        pass_index=int(p), mjd=c.mjd, sat=m[3]))
+                        pass_index=int(p), mjd=c.mjd, sat=m[3], obs=c.obs_id,
+                        snr=round(float(m[0] / m[1]), 1) if m[1] and m[1] > 0 else None,
+                        flags=_flag_groups(c, r_, d_)))
     # One-off bad photos (a cosmic-ray hit, a satellite) give single points far off the
     # rest. A point is flagged as an outlier when it disagrees with the photos taken at
     # nearly the same wavelength in the same sky pass by much more than their scatter.
@@ -310,9 +328,16 @@ LENSES = {
 }
 
 
-def lens(ra0: float, dec0: float, field_deg: float, key: str, pass_index: int | None = None) -> dict:
+def lens(ra0: float, dec0: float, field_deg: float, key: str, pass_index: int | None = None,
+         windows=None) -> dict:
     pos = load_position(ra0, dec0, field_deg)
-    L = LENSES[key]
+    if key == "custom":
+        # the person's own three wavelength ranges, as red, green and blue
+        L = dict(name="Your own colours", windows=[tuple(w) for w in windows],
+                 explain="Red, green and blue show the three wavelength ranges you chose. Colours are balanced "
+                         "so that typical stars of this field look white.")
+    else:
+        L = LENSES[key]
     grid, shape = frames.target_grid(pos["ra"], pos["dec"], field_deg)
     chans, counts = [], []
     for lo, hi in L["windows"]:
