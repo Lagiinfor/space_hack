@@ -34,6 +34,9 @@ function pointHover(q) {
 
 // ---------------------------------------------------------------- spectrum extras
 S.hideFlagged = false;
+// Switched off at the team's request (they did not like how these looked). The code is kept:
+// set to true to bring back the brightness-over-time plot or the measurement-quality table.
+const SHOW_LIGHTCURVE = false, SHOW_QUALITY = false;
 const x0_plotSpectrum = plotSpectrum;
 plotSpectrum = function () {
   const sp = S.spec;
@@ -118,14 +121,14 @@ function renderExtras() {
     box = document.createElement("div"); box.id = "objextras";
     $("specwarn").insertAdjacentElement("afterend", box);
   }
-  const lc = lightCurve();
+  const lc = SHOW_LIGHTCURVE ? lightCurve() : [];
   box.innerHTML = `<div class="row wrap" style="margin:8px 0">` +
     `<button class="small-btn" id="xcsv" title="Every measurement behind the graph, with uncertainty, date and NASA's flags">⬇ Spectrum (CSV)</button>` +
     (lc.length ? `<button class="small-btn" id="xlccsv">⬇ Brightness over time (CSV)</button>` : "") + `</div>` +
     (lc.length ? `<div class="ctl-label">Brightness over time <span class="muted">(one line per infrared colour)</span></div><div id="xlc"></div>` +
       `<p class="muted small-note">Each point is the median of one detector's photos in one sky pass (one-off outliers left out); the bar is its uncertainty. ` +
       `A line that rises or falls well beyond its bars is a real brightness change. With only ${S.R.passes.length} passes this is a coarse light curve.</p>` : "") +
-    qualityHtml();
+    (SHOW_QUALITY ? qualityHtml() : "");
   $("xcsv").onclick = () => xDownload(`spherex_spectrum_${sp.ra.toFixed(4)}_${sp.dec.toFixed(4)}.csv`, spectrumCsv());
   if ($("xlccsv")) $("xlccsv").onclick = () => xDownload(`spherex_lightcurve_${sp.ra.toFixed(4)}_${sp.dec.toFixed(4)}.csv`, lightCurveCsv());
   if ($("xhide")) $("xhide").onchange = (e) => { S.hideFlagged = e.target.checked; plotSpectrum(); };
