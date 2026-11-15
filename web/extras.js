@@ -377,3 +377,32 @@ if (x0_renderCatChips) renderCatChips = function () { x0_renderCatChips(); if (S
 
 const x0_refreshX = refresh;
 refresh = function () { x0_refreshX(); pairUI(); };
+
+// ---------------------------------------------------------------- NASA's archive busy: try again by itself
+// The server already retries a few times within seconds. An outage can last longer, so the page
+// keeps trying once a minute (up to 10 times) and says so, instead of leaving the person to guess.
+let xRetry = null;
+const x0_fail = fail;
+fail = function (msg) {
+  x0_fail(msg);
+  clearInterval(xRetry && xRetry.timer);
+  if (!/archive is not answering/i.test(msg || "")) { xRetry = null; return; }
+  const want = $("where").value;
+  const n = xRetry && xRetry.want === want ? xRetry.n + 1 : 1;
+  if (n > 10) { xRetry = null; return; }
+  let left = 60;
+  const note = document.createElement("p");
+  note.className = "muted"; note.style.marginTop = "10px";
+  $("viewerror").appendChild(note);
+  const tick = () => {
+    note.textContent = `Trying again by itself in ${left} seconds (attempt ${n} of 10). You can also pick a showcase target meanwhile: those are saved on this computer.`;
+    if (left-- <= 0) {
+      clearInterval(xRetry.timer);
+      if ($("where").value === want && !S.R && document.body.classList.contains("on-explore")) {
+        go(want);
+      }
+    }
+  };
+  xRetry = { want, n, timer: setInterval(tick, 1000) };
+  tick();
+};

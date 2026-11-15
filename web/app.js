@@ -130,6 +130,12 @@ async function load(ra, dec, field, keepBand) {
   $("viewerror").classList.add("hidden");
   $("player").classList.add("hidden");
   $("specpanel").classList.add("hidden");
+  // nothing of the patch shown before may stay on screen while (or if) the new one fails to load
+  for (const id of ["info", "astpanel", "moverpanel"]) $(id).classList.add("hidden");
+  if ($("scanbanner")) $("scanbanner").className = "scanbanner hidden";
+  { const cv = $("sky"); cv.getContext("2d").clearRect(0, 0, cv.width, cv.height); }
+  $("olabel").textContent = ""; $("osub").textContent = ""; $("legend").classList.add("hidden");
+  S.R = null; S.ast = null; S.picks = null; S.click = null; S.spec = null;
   $("wherenow").textContent = `RA ${(+ra).toFixed(4)}°, Dec ${(+dec).toFixed(4)}°`;
   showProgress("Starting...", 0.01);
   $("error").textContent = "";
