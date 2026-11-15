@@ -5,9 +5,9 @@ TOUR = [
     dict(key="barnard", name="Barnard's Star", query="Barnard's star", band=3, field=0.1, other=True,
          kind="Fast-moving star",
          story="The fastest-moving star in our sky, 6 light-years away. It crawls about 10 arcseconds "
-               "north each year. The timeline starts with older photos from two other telescopes: NASA's WISE "
+               "north each year. Switch on 'Older photos (2010 →)' and the timeline starts with older photos from two other telescopes: NASA's WISE "
                "in 2010 and Canada's NEOSSat in 2019, then SPHEREx in 2025 and 2026. Watch the star march "
-               "upward across 16 years (about 2.7 arcminutes). Switch off 'Older photos' and choose 'Changes "
+               "upward across 16 years (about 2.7 arcminutes). Without 'Older photos', choose 'Changes "
                "only' for the fair SPHEREx-only comparison: a red/blue pair that flips."),
     dict(key="epsindib", name="Epsilon Indi B", query="eps Indi B", band=6, field=0.06,
          kind="Pair of brown dwarfs",
