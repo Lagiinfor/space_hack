@@ -301,11 +301,3 @@ table.xtable th, table.xtable td { border: 1px solid var(--line2); padding: 3px 
 table.xtable th { color: #cdd9e5; font-weight: 600; cursor: help; }
 #revbtn.on { background: rgba(108,196,255,0.16); border-color: var(--accent); }
 #customlens input { background: rgba(0,0,0,0.3); color: inherit; border: 1px solid var(--line2); border-radius: 6px; padding: 2px 4px; }
-
-/* ---------- side by side, export ---------- */
-.sidebox { margin: 10px 0; }
-.siderow { display: flex; gap: 8px; overflow-x: auto; }
-.siderow figure { margin: 0; flex: 1 1 0; min-width: 180px; }
-.siderow img { width: 100%; border-radius: 10px; border: 1px solid var(--line2); display: block; }
-.siderow figcaption { font-size: 12.5px; color: #cdd9e5; text-align: center; padding: 4px 0; }
-#exportbox select { max-width: 260px; }
