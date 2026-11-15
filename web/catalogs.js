@@ -207,17 +207,31 @@ function renderScanBanner() {
   const checked = (S.picks.checked && S.picks.checked.length ? S.picks.checked.join(", ") : "no catalogue");
   const notes = (S.picks.notes || []).length ? `<div class="muted small-note">${S.picks.notes.map(esc).join(" ")}</div>` : "";
   const btn = `<button class="${S.showPicks ? "small-btn" : "primary"}" onclick="bannerShow()">${S.showPicks ? "Hide them" : "Show me where"}</button>`;
-  if (!P.length) {
+  // known asteroids and comets: these move far too fast to appear in the stacked pictures, so the
+  // scan of the stacks cannot find them; the asteroid check looks for them in the single photos
+  const ast = astSummary();
+  const astBits = [];
+  if (ast.caught.length) astBits.push(`<b>${pl(ast.caught.length, "known asteroid or comet", "known asteroids or comets")} caught in SPHEREx's single photos</b>`);
+  const astTail = (ast.pending ? ` <span class="muted">The check for known asteroids is still running.</span>` : "") +
+    (ast.faint ? ` <span class="muted">${pl(ast.faint, "known asteroid", "known asteroids")} also crossed the patch, too faint to see (marked on the picture).</span>` : "");
+  if (!P.length && !ast.caught.length) {
     el.className = "scanbanner none";
     el.innerHTML = `<div><b>The computer found no candidates in this patch under these conditions.</b> ` +
-      `<span class="muted">It looked for steady movers (about 1.5″ per pass up to 12″ per year), clear brightness changes and unusually red objects. ` +
-      `Fainter or faster things can still be here, so your eyes still count.</span>${notes}</div>`;
+      `<span class="muted">It looked for steady movers (about 1.5″ per pass up to 12″ per year), clear brightness changes, unusually red objects, ` +
+      `and known asteroids in the single photos. Fainter or faster things can still be here, so your eyes still count.</span>${astTail}${notes}</div>`;
+    return;
+  }
+  if (!P.length) {
+    el.className = "scanbanner found";
+    el.innerHTML = `<div>☄ The computer found ${astBits[0]} in this patch. ` +
+      `<span class="muted">Nothing else stood out in the stacked pictures.</span>${astTail}${notes}</div>${btn}`;
     return;
   }
   const found = [];
   if (U) found.push(`<b>${pl(U, "unexplained moving object", "unexplained moving objects")}</b>`);
   if (C) found.push(`<b>${pl(C, "brightness change", "brightness changes")}</b>`);
   if (R) found.push(`<b>${pl(R, "unusually red object", "unusually red objects")}</b>`);
+  found.push(...astBits);
   const knownIn = [...new Set(K.flatMap((p) => p.known_in || []))].join(" and ") || "a catalogue";
   const also = [];
   if (K.length) also.push(`${pl(K.length, "moving object", "moving objects")} that ${K.length === 1 ? "is" : "are"} already known in ${knownIn}`);
@@ -226,21 +240,60 @@ function renderScanBanner() {
     el.className = "scanbanner found";
     el.innerHTML = `<div>💡 The computer found ${found.join(", ").replace(/, ([^,]*)$/, " and $1")} in this patch` +
       (also.length ? `, plus ${also.join(" and ")}` : "") + `. ` +
-      (U ? `<span class="muted">Unexplained means: not recognised in the catalogues checked (${esc(checked)}).</span>` : "") + `${notes}</div>${btn}`;
+      (U ? `<span class="muted">Unexplained means: not recognised in the catalogues checked (${esc(checked)}).</span>` : "") + `${astTail}${notes}</div>${btn}`;
   } else {
     el.className = "scanbanner known";
     el.innerHTML = `<div>✔ The computer found ${also.join(" and ")} in this patch, and nothing unexplained. ` +
-      `<span class="muted">Catalogues checked: ${esc(checked)}.</span>${notes}</div>${btn}`;
+      `<span class="muted">Catalogues checked: ${esc(checked)}.</span>${astTail}${notes}</div>${btn}`;
   }
 }
 
+// what the asteroid check found for this patch (it runs separately from the scan of the stacks)
+function astSummary() {
+  const A = S.ast && S.R && !S.R.preview ? S.ast.objects || [] : null;
+  if (!A) return { pending: true, caught: [], faint: 0 };
+  const caught = A.filter((o) => o.n_caught > 0);
+  return { pending: false, caught, faint: A.length - caught.length };
+}
+
+function astPicksHtml() {
+  const { caught } = astSummary();
+  if (!caught.length) return "";
+  return `<ol class="picks" style="margin-bottom:8px">` + caught.map((o) =>
+    `<li><span class="pk" style="background:#ffc857;color:#111">☄</span><div><b>Known ${o.kind && /comet/i.test(o.kind) ? "comet" : "asteroid"} ${esc(o.number ? o.number + " " + o.name : o.name)}</b>` +
+    (o.risk && o.risk.neo ? ` <span class="muted">(near-Earth)</span>` : "") +
+    `<br>Caught in ${o.n_caught} of the ${o.n_photos} single photos taken while it crossed this patch. It moves far too fast to show in the stacked ` +
+    `pictures, so it is found in the single photos instead. Details are in the Asteroids and comets panel. ` +
+    `<button class="small-btn" onclick="showAsteroidPhotos('${encodeURIComponent(o.name)}')">▶ See it in the photos</button></div></li>`).join("") + `</ol>`;
+}
+
 function bannerShow() {
+  if (!S.showPicks && astSummary().caught.length && !S.showAst) $("astBtn").click();   // make sure its marks are on
   togglePicks(!S.showPicks);
   if (S.showPicks) $("sky").scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
 const cat0_renderPicks = renderPicks;
-renderPicks = function () { cat0_renderPicks(); renderScanBanner(); renderCatChips(); };
+renderPicks = function () {
+  cat0_renderPicks();
+  // the picks list also names known asteroids caught in the single photos
+  if (S.R && S.showPicks && S.picks && !S.picks.error && !S.R.preview && !S.practice) {
+    const h = astPicksHtml();
+    if (h) {
+      const el = $("moverlist");
+      if (!(S.picks.picks || []).length)
+        el.innerHTML = h + `Apart from that, the computer found nothing unusual in the stacked pictures: nothing moving steadily (between about 1.5″ per pass ` +
+          `and 12″ per year), no clear brightness change, nothing unusually red. Fainter things could still be hiding, so your eyes still count. ` +
+          `<div style="margin-top:8px"><button class="small-btn" onclick="togglePicks(false)">Hide</button></div>`;
+      else el.innerHTML = h + el.innerHTML;
+    }
+  }
+  renderScanBanner(); renderCatChips();
+};
+
+// the asteroid check finishes on its own schedule: refresh the notice and the list when it does
+const cat0_renderAsteroids = renderAsteroids;
+renderAsteroids = function () { cat0_renderAsteroids(); if (S.R) renderPicks(); };
 
 const _afterFinalCats = afterFinal;
 afterFinal = function () {
