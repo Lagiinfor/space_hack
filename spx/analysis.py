@@ -741,7 +741,13 @@ def picks(ra0: float, dec0: float, field_deg: float, cats="gaia") -> dict:
     out.sort(key=lambda o: -o["score"])
     for i, o in enumerate(out[:12]):
         o["n"] = i + 1
-    return dict(picks=out[:12], n_sources=len(srcs), checked=m.get("checked", []), notes=m.get("notes", []))
+    # every point of light the tool itself detected in the deepest picture (signal over 8x the noise)
+    detections = []
+    for s_ in srcs:
+        e_, n_ = en(s_["x"], s_["y"])
+        detections.append(dict(east=round(e_, 1), north=round(n_, 1), snr=round(float(s_.get("snr", 0)), 1)))
+    return dict(picks=out[:12], n_sources=len(srcs), detections=detections,
+                checked=m.get("checked", []), notes=m.get("notes", []))
 
 
 
