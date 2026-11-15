@@ -5,6 +5,8 @@
 const $ = (id) => document.getElementById(id);
 const GAIA_GMAX = 16.5;
 const MIN_EXPOSURES = 6;
+// does a detector belong to the band on screen? (0 = all; 36 = detectors 3 and 6 combined, see bands.js)
+const bandHas = (b) => S.band === 0 || b === S.band || (S.band > 6 && String(S.band).includes(String(b)));
 const TAB_ID = Math.random().toString(36).slice(2, 10);   // lets the server tell browser tabs apart
 // a colour per detector for the band buttons: short (bluish) to long (red) infrared
 const BAND_COLORS = { 1: "#7aa2ff", 2: "#62c7ff", 3: "#5fe0c0", 4: "#c6e66a", 5: "#ffb35c", 6: "#ff6f61" };
@@ -511,6 +513,7 @@ function draw() {
     const viewTxt = { normal: "", diff: " (difference)", first: ` (minus ${S.R.passes[fs[0].pass_index].label})`, stack: "" }[S.view];
     label = S.view === "stack" ? "All passes added" : p.label + viewTxt;
     const bandName = S.band === 0 ? `${f.n_detectors ?? 6} of 6 detectors averaged`
+      : f.combo ? `${f.combo.length} colours averaged (${f.ranges.join(" + ")} µm), same mix in every pass`
       : (f.wl_min ? `${f.wl_min.toFixed(2)}–${f.wl_max.toFixed(2)} µm, same wavelength mix in every pass` : "");
     const nimg = S.view === "stack" ? fs.reduce((s, g) => s + g.n, 0) : f.n;
     const skipped = all.filter((g) => !fs.includes(g)).map((g) => S.R.passes[g.pass_index].label);
@@ -642,7 +645,7 @@ function listExposures() {
   const f = currentFrame();
   if (f.other) { $("explist").textContent = f.note + "."; return; }
   const ex = S.R.exposures.filter((e) => (S.view === "stack" || e.pass_index === f.pass_index) &&
-    (S.band === 0 || e.band === S.band)).sort((a, b) => a.mjd - b.mjd);
+    bandHas(e.band)).sort((a, b) => a.mjd - b.mjd);
   const date = (mjd) => new Date((mjd - 40587) * 86400000).toISOString().slice(0, 16).replace("T", " ");
   $("explist").innerHTML = `<table><tr><th>Date (UTC)</th><th>Detector</th><th>Wavelength here</th>${ex[0] && ex[0].obs_id ? "<th>Observation</th>" : ""}</tr>` +
     ex.map((e) => `<tr><td>${date(e.mjd)}</td><td>${e.band}</td><td>${e.wl.toFixed(3)} µm</td>${e.obs_id ? `<td>${e.obs_id}</td>` : ""}</tr>`).join("") + "</table>";

@@ -366,7 +366,8 @@ def flags_map(ra0: float, dec0: float, field_deg: float, pass_index: int, band: 
     pos = load_position(ra0, dec0, field_deg)
     grid, shape = frames.target_grid(pos["ra"], pos["dec"], field_deg)
     sel = [c for c, p in zip(pos["cuts"], pos["passes"])
-           if p == pass_index and (band == 0 or c.detector == band)]
+           if p == pass_index and (band == 0 or c.detector == band
+                                   or (band > 6 and str(c.detector) in str(band)))]   # 36 = detectors 3 and 6
     out = {}
     for name, bits in FLAG_GROUPS.items():
         mask = sum(frames.FLAG_BITS[b] for b in bits)

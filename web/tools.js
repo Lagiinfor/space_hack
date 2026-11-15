@@ -158,7 +158,7 @@ async function playPhotosHere() {
   if (!S.R || !S.click) return;
   play(false);
   const k = (S.mode === "flip" && currentPass() !== null) ? currentPass() : S.R.passes.length - 1;
-  let ex = S.R.exposures.filter((e) => e.pass_index === k && (S.band === 0 || e.band === S.band) && e.obs_id).sort((a, b) => a.mjd - b.mjd);
+  let ex = S.R.exposures.filter((e) => e.pass_index === k && bandHas(e.band) && e.obs_id).sort((a, b) => a.mjd - b.mjd);
   if (ex.length > 16) ex = Array.from({ length: 16 }, (_, i) => ex[Math.round(i * (ex.length - 1) / 15)]);
   if (!ex.length) { $("hover").textContent = "No single photos available for this frame."; return; }
   $("hover").textContent = `Loading ${ex.length} single photos from ${S.R.passes[k].label}...`;
