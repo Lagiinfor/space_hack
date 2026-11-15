@@ -87,7 +87,7 @@ function rescanWithCats() {
 
 async function toggleCat(key) {
   if (S.cats.has(key)) S.cats.delete(key);
-  else { S.cats.add(key); S.showGaia = true; }
+  else { S.cats.add(key); if (!S.tableOnly) S.showGaia = true; }
   try { localStorage.setItem("cats.v2", JSON.stringify([...S.cats])); } catch (e) { /* private window */ }
   delete S.catState[key];
   renderCatChips();

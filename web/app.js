@@ -720,14 +720,15 @@ const lensCache = new Map();
 let lensWanted = "";
 async function loadLens() {
   const pp = S.lensPass === "all" ? "" : `&pass_index=${S.lensPass}`;
-  const key = `${S.R.ra},${S.R.dec},${S.R.field_deg},${S.lensKey}${pp}`;
+  const custom = S.lensKey === "custom" ? `&win=${S.lensWin}` : "";
+  const key = `${S.R.ra},${S.R.dec},${S.R.field_deg},${S.lensKey}${custom}${pp}`;
   if (lensCache.has(key)) { S.lensData = lensCache.get(key); $("lensexplain").textContent = S.lensData.explain; draw(); return; }
   if (lensWanted === key) return;          // already on its way
   lensWanted = key;
   $("lensexplain").textContent = "Building this filter: sorting every photo by the colour it saw (a few seconds)...";
   showLensBusy(true);
   try {
-    const L = await api(`/api/lens?${posQuery()}&key=${S.lensKey}${pp}`);
+    const L = await api(`/api/lens?${posQuery()}&key=${S.lensKey}${custom}${pp}`);
     L.arr = L.channels.map(unpack);
     lensCache.set(key, L);
     if (lensWanted !== key) return;        // the person picked another filter meanwhile
@@ -860,7 +861,8 @@ function plotSpectrum() {
       marker: { size: 4, color: col, opacity: pts.map((q) => q.outlier ? 0.2 : 0.45),
         symbol: pts.map((q) => q.outlier ? "circle-open" : q.sat ? "x" : "circle") },
       error_y: { type: "data", array: pts.map((q) => q.err), visible: true, color: col, thickness: 0.6, width: 0 },
-      text: pts.map((q) => q.outlier ? "<br>(one-off bad photo: left out of the line)" : ""),
+      text: pts.map((q) => (q.outlier ? "<br>(one-off bad photo: left out of the line)" : "") +
+        (typeof pointHover === "function" ? pointHover(q) : "")),
       hovertemplate: "%{x:.3f} µm<br>%{y:.3g} mJy%{text}<extra>" + p.label + "</extra>",
     });
     traces.push({
@@ -1073,11 +1075,23 @@ async function init() {
   // open straight onto a shared link: ?ra=..&dec=..&field=..&band=..&mode=..&lens=..&gaia=1&view=..
   const p = new URLSearchParams(location.search);
   if (p.get("view")) { S.view = p.get("view"); $("view").value = S.view; }
-  if (p.has("ra") && p.has("dec")) {
-    const field = p.get("field") || "0.06";
-    if ([...$("field").options].some((o) => o.value === field)) $("field").value = field;
-    $("where").value = `${p.get("ra")} ${p.get("dec")}`;
-    load(parseFloat(p.get("ra")), parseFloat(p.get("dec")), parseFloat(field)).catch((e) => fail(e.message));
+  if (p.has("ra") || p.has("dec")) {
+    const ra = parseFloat(p.get("ra")), dec = parseFloat(p.get("dec"));
+    if (!(ra >= 0 && ra < 360) || !(dec >= -90 && dec <= 90)) {
+      $("error").textContent = "This link has a position the tool cannot use (RA must be a number from 0 to 360, Dec from -90 to +90, both in degrees). Pick a patch below instead.";
+      history.replaceState(null, "", location.pathname);
+      return;
+    }
+    // field of view in degrees: "field" or "fov". Anything else than the four sizes is moved to the nearest one.
+    const sizes = [...$("field").options].map((o) => o.value);
+    const want = parseFloat(p.get("field") || p.get("fov") || "0.06");
+    const field = Number.isFinite(want) && want > 0
+      ? sizes.reduce((a, b) => (Math.abs(parseFloat(b) - want) < Math.abs(parseFloat(a) - want) ? b : a)) : "0.06";
+    if (Number.isFinite(want) && Math.abs(parseFloat(field) - want) > 1e-6)
+      $("error").textContent = `The link asked for a field of ${want}°; the nearest size the tool offers is ${field}° (the largest is 0.15°).`;
+    $("field").value = field;
+    $("where").value = `${ra} ${dec}`;
+    load(ra, dec, parseFloat(field)).catch((e) => fail(e.message));
   }
 }
 init();

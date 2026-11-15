@@ -248,7 +248,7 @@ def gaia_movers_near(ra, dec, radius_deg=0.5, min_pm=80.0):
     """Gaia stars with clear motion across the sky in a wide circle (for partner search)."""
     q = (f"SELECT source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag FROM gaiadr3.gaia_source WHERE "
          f"1=CONTAINS(POINT(ra,dec),CIRCLE({ra},{dec},{radius_deg})) AND pm > {min_pm}")
-    rows = _tap_csv(GAIA_TAP, q)
+    rows = _tap_csv(GAIA_TAP, q, timeout=12)
     f = lambda v: float(v) if v not in ("", None) else 0.0  # noqa: E731
     return [dict(id=r["source_id"], ra=f(r["ra"]), dec=f(r["dec"]), pmra=f(r["pmra"]), pmdec=f(r["pmdec"]),
                  parallax=f(r["parallax"]), g=f(r["phot_g_mean_mag"])) for r in rows]

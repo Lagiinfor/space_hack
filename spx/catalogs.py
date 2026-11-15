@@ -292,7 +292,8 @@ def for_view(ra0: float, dec0: float, field_deg: float, key: str) -> dict:
             o["ve"], o["vn"] = s["pme"], s["pmn"]
             o["pm"] = round(float(np.hypot(s["pme"], s["pmn"])), 2)
         if key == "simbad":
-            o["type"], o["plain"] = s["type"], s["plain"]
+            from . import objcheck
+            o["type"], o["plain"] = objcheck.OTYPES.get(s["type"], s["type"]), s["plain"]
         elif s.get("pme") is None:
             o["old"] = True            # position as it was in `year`; the catalogue gives no motion
         out.append(o)
