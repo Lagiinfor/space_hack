@@ -232,6 +232,7 @@ function knownHtml(K) {
   if (faint) L.push(`<li>☄ ${faint} known asteroid${faint > 1 ? "s" : ""} crossed this patch, too faint for SPHEREx to see. Its place and direction are marked on the picture (pale diamond, "☄ Asteroids" switched on).</li>`);
   if (K.n_gaia !== undefined) L.push(`<li class="muted">${K.n_gaia} ordinary stars here are in the Gaia catalogue (turn on "Catalogue marks" to see them).</li>`);
   for (const n of K.notes) L.push(`<li class="muted">${esc(n)}</li>`);
+  if (typeof S.cats !== "undefined" && !S.cats.size) L.push(`<li class="muted">No catalogue is switched on, so stars and named objects are not listed. Switch on Gaia, SIMBAD or others under "Catalogues of known objects".</li>`);
   return `<div class="ctl-label">Already known in this patch</div><ul class="known">${L.join("") || "<li class='muted'>Nothing notable is catalogued here.</li>"}</ul>` +
     `<div class="muted small-note">These are not discoveries: they are listed so you can tell known things from unexplained ones.</div>`;
 }

@@ -131,6 +131,8 @@ if have(331.097, -56.8008):
     try:
         c = objcheck.checks(331.097, -56.8008, 0.06, 331.097, -56.8008, spec=sp, movers=analysis.movers(331.097, -56.8008, 0.06))
         pr = c["partner"].get("partners", [])
+        if c["partner"].get("error"):
+            raise RuntimeError("ESA's Gaia archive is not reachable just now")
         check("Epsilon Indi B: partner star found (Epsilon Indi A, moving the same way)", bool(pr) and pr[0]["g"] < 6,
               str(pr[:1]))
     except Exception as e:

@@ -67,6 +67,9 @@ class Cancelled(Exception):
     """The person asked for another patch before this one finished."""
 
 
+JUST_BUILT = None     # the photos of the patch built last, still in memory (see analysis._load)
+
+
 def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage, frac: None, stop=None,
           on_preview=None) -> dict:
     ra, dec = round(ra, 4), round(dec, 4)
@@ -122,6 +125,7 @@ def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage,
             break
         with lock:
             have = list(done_paths)
+        load_new(have)       # read photos as they arrive, so nothing is left to read when the download ends
         if on_preview and checkpoints and len(have) >= checkpoints[0] and len(have) < n_img:
             while checkpoints and len(have) >= checkpoints[0]:
                 checkpoints.pop(0)
@@ -144,6 +148,9 @@ def build(ra: float, dec: float, field_deg: float = 0.06, progress=lambda stage,
     result = make_result(cuts, images, ra, dec, field_deg, pdir, progress=progress)
     out_tmp = out if result["complete"] else out.with_name(out.stem + "_partial.json")
     out_tmp.write_text(json.dumps(result))
+    if result["complete"]:
+        global JUST_BUILT
+        JUST_BUILT = dict(key=(ra, dec, field_deg), cuts=cuts)
     progress("Done", 1.0)
     return result
 

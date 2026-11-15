@@ -194,7 +194,12 @@ def _what_by_rules(spec: dict) -> dict:
 def _tap_csv(url, query, timeout=45, extra=None):
     params = {"REQUEST": "doQuery", "LANG": "ADQL", "FORMAT": "csv", "QUERY": query}
     params.update(extra or {})
-    r = _s.get(url, params=params, timeout=timeout)
+    try:
+        r = _s.get(url, params=params, timeout=timeout)
+    except requests.ConnectionError:      # archives drop a connection now and then: one more try
+        import time
+        time.sleep(1.0)
+        r = _s.get(url, params=params, timeout=timeout)
     r.raise_for_status()
     if not r.text.lstrip().lower().startswith(("main_id", "source_id", '"main_id', "ra", "designation")):
         raise RuntimeError("unexpected answer")
@@ -335,7 +340,9 @@ def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None, cats="gaia") -
         dt = jyear - 2000.0
         also = (ra - dt * motion["east"] / 3600 / cosd, dec - dt * motion["north"] / 3600)
     try:
-        radius = 12.0 if not (motion and motion["rate"] > 0.5 and not g.get("found")) else 12.0
+        if "simbad" not in keys:
+            raise LookupError("off")
+        radius = 12.0
         named, err = simbad_near(ra, dec, radius, also=also)
         if also and motion and not g.get("found"):
             # measured motions are rough, so the year-2000 position is uncertain: look wider there
@@ -345,6 +352,8 @@ def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None, cats="gaia") -
                 if o["name"] not in {x["name"] for x in named} and (o["type_code"] in ("BD*", "PM*", "LM*", "HV*", "*", "**")):
                     named.append(o)
         out["simbad"] = dict(objects=named[:4], error=err)
+    except LookupError:
+        out["simbad"] = dict(objects=[], off=True)
     except Exception as e:
         out["simbad"] = dict(objects=[], error=str(e))
 
@@ -373,7 +382,9 @@ def checks(ra0, dec0, field_deg, ra, dec, spec=None, movers=None, cats="gaia") -
             my = (g["pmra"] / 1000, g["pmdec"] / 1000, 0.03, g.get("id"))          # arcsec/yr, tolerance
         elif motion and motion["rate"] >= 0.5 and (motion.get("sigma", 0) >= 5 or motion.get("significant")):
             my = (motion["east"], motion["north"], 1.0, None)
-        if my:
+        if my and "gaia" not in keys:
+            out["partner"] = dict(checked=False, off=True)
+        elif my:
             partners = []
             for s in gaia_movers_near(ra, dec):
                 if my[3] and s["id"] == my[3]:

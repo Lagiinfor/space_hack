@@ -285,6 +285,7 @@ function fillPatchInfo() {
 }
 
 function framesForBand() {
+  if (!S.R) return [];        // between two patches (the play timer may still tick)
   return S.R.frames.filter((f) => f.band === S.band).sort((a, b) => a.pass_index - b.pass_index);
 }
 function blinkFrames() {

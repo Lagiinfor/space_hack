@@ -21,9 +21,11 @@ const CAT = Object.fromEntries(CAT_LIST.map((c) => [c.key, c]));
 const CAT_RING = { catwise: 1.5, twomass: 1.85, panstarrs: 2.2, skymapper: 2.55 };   // radius, in picture pixels
 const CAT_FAINTEST = { panstarrs: 20, catwise: 16.8, skymapper: 19 };    // fainter sources are not drawn (SPHEREx cannot see them)
 
-S.cats = new Set(["gaia"]);
+// All catalogues start switched off: the person looks first, and chooses what to compare with.
+// (The choice is remembered on this computer from then on.)
+S.cats = new Set();
 try {
-  const saved = JSON.parse(localStorage.getItem("cats") || "null");
+  const saved = JSON.parse(localStorage.getItem("cats.v2") || "null");
   if (Array.isArray(saved)) S.cats = new Set(saved.filter((k) => CAT[k]));
 } catch (e) { /* no saved choice */ }
 S.catData = {}; S.catState = {};
@@ -56,7 +58,7 @@ function renderCatChips() {
   }
   const old = catKeys().filter((k) => ["twomass", "panstarrs", "skymapper"].includes(k));
   if (old.length && S.showGaia) notes.push(`${catNames(old)}: marks show where each source was when that survey photographed it (no motions given).`);
-  info.innerHTML = (catKeys().length ? `Known or unexplained is judged against: <b>${catNames()}</b>.` : `<b>No catalogue is switched on</b>, so nothing can be recognised as known.`) +
+  info.innerHTML = (catKeys().length ? `Known or unexplained is judged against: <b>${catNames()}</b>.` : `<b>No catalogue is switched on.</b> Switch one on to see which objects are already known; until then the tool does not compare with any.`) +
     (notes.length ? "<br>" + notes.map(esc).join("<br>") : "");
 }
 
@@ -86,7 +88,7 @@ function rescanWithCats() {
 async function toggleCat(key) {
   if (S.cats.has(key)) S.cats.delete(key);
   else { S.cats.add(key); S.showGaia = true; }
-  try { localStorage.setItem("cats", JSON.stringify([...S.cats])); } catch (e) { /* private window */ }
+  try { localStorage.setItem("cats.v2", JSON.stringify([...S.cats])); } catch (e) { /* private window */ }
   delete S.catState[key];
   renderCatChips();
   if (S.cats.has(key)) {
@@ -201,7 +203,8 @@ function renderScanBanner() {
   const mv = P.filter((p) => p.kind === "mover");
   const U = mv.filter((p) => p.status.startsWith("candidate")).length;
   const K = mv.filter((p) => p.status.startsWith("known"));
-  const D = mv.length - U - K.length;
+  const N = mv.filter((p) => p.status.startsWith("unchecked")).length;      // no catalogue switched on
+  const D = mv.length - U - K.length - N;
   const C = P.filter((p) => p.kind === "changed").length, R = P.filter((p) => p.kind === "red").length;
   const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   const checked = (S.picks.checked && S.picks.checked.length ? S.picks.checked.join(", ") : "no catalogue");
@@ -213,7 +216,7 @@ function renderScanBanner() {
   const astBits = [];
   if (ast.caught.length) astBits.push(`<b>${pl(ast.caught.length, "known asteroid or comet", "known asteroids or comets")} caught in SPHEREx's single photos</b>`);
   const astTail = (ast.pending ? ` <span class="muted">The check for known asteroids is still running.</span>` : "") +
-    (ast.faint ? ` <span class="muted">${pl(ast.faint, "known asteroid", "known asteroids")} also crossed the patch, too faint to see (marked on the picture).</span>` : "");
+    (ast.faint ? ` <span class="muted">${pl(ast.faint, "known asteroid", "known asteroids")} also crossed the patch, too faint to see clearly (marked on the picture).</span>` : "");
   if (!P.length && !ast.caught.length) {
     el.className = "scanbanner none";
     el.innerHTML = `<div><b>The computer found no candidates in this patch under these conditions.</b> ` +
@@ -230,6 +233,7 @@ function renderScanBanner() {
   const found = [];
   if (U) found.push(`<b>${pl(U, "unexplained moving object", "unexplained moving objects")}</b>`);
   if (C) found.push(`<b>${pl(C, "brightness change", "brightness changes")}</b>`);
+  if (N) found.push(`<b>${pl(N, "moving object", "moving objects")}</b>`);
   if (R) found.push(`<b>${pl(R, "unusually red object", "unusually red objects")}</b>`);
   found.push(...astBits);
   const knownIn = [...new Set(K.flatMap((p) => p.known_in || []))].join(" and ") || "a catalogue";
@@ -240,7 +244,9 @@ function renderScanBanner() {
     el.className = "scanbanner found";
     el.innerHTML = `<div>💡 The computer found ${found.join(", ").replace(/, ([^,]*)$/, " and $1")} in this patch` +
       (also.length ? `, plus ${also.join(" and ")}` : "") + `. ` +
-      (U ? `<span class="muted">Unexplained means: not recognised in the catalogues checked (${esc(checked)}).</span>` : "") + `${astTail}${notes}</div>${btn}`;
+      (U ? `<span class="muted">Unexplained means: not recognised in the catalogues checked (${esc(checked)}).</span>` : "") +
+      (N ? `<span class="muted">No catalogue is switched on, so it is not yet known whether ${N === 1 ? "it is" : "they are"} already catalogued.</span>` : "") +
+      `${astTail}${notes}</div>${btn}`;
   } else {
     el.className = "scanbanner known";
     el.innerHTML = `<div>✔ The computer found ${also.join(" and ")} in this patch, and nothing unexplained. ` +
@@ -252,7 +258,8 @@ function renderScanBanner() {
 function astSummary() {
   const A = S.ast && S.R && !S.R.preview ? S.ast.objects || [] : null;
   if (!A) return { pending: true, caught: [], faint: 0 };
-  const caught = A.filter((o) => o.n_caught > 0);
+  // "caught" for the notice means seen in at least two single photos: one lone detection can be chance
+  const caught = A.filter((o) => o.n_caught >= 2 || (o.n_caught === 1 && o.n_photos === 1));
   return { pending: false, caught, faint: A.length - caught.length };
 }
 
@@ -333,7 +340,7 @@ checkLines = function (C) {
       ` in the SIMBAD database` + (o.found !== "here" ? `, found at the place it occupied in the year 2000` : "") + `.` +
       (sb.objects.length > 1 ? ` Also nearby: ${sb.objects.slice(1).map((x) => esc(x.name)).join(", ")}.` : "")]);
   } else if (sb.error) L.push(["warn", "The SIMBAD name database could not be reached."]);
-  else noMatch.push("SIMBAD names");
+  else if (!sb.off) noMatch.push("SIMBAD names");
 
   if (noMatch.length) L.push([L.some((l) => l[0] === "known") ? "info" : "new", `<b>Checked without a match:</b> ${noMatch.map(esc).join(", ")}.` +
     (noMatch.includes("Gaia") && !g.background_star ? ` (Gaia sees visible light, so cold or very faint objects are outside its reach.)` : "")]);
@@ -359,6 +366,7 @@ checkLines = function (C) {
     L.push(["info", `<b>It may have a partner:</b> a Gaia star (G=${x.g}) ${x.sep_arcsec}″ away moves the same way (${x.pm}″ per year, ` +
       `differing by only ${x.diff}″)` + (x.distance_ly ? `, ${x.distance_ly} light-years away` : "") + `. Two objects travelling together are usually a real pair.`]);
   } else if (p.checked) L.push(["info", `No partner found: no Gaia star within half a degree moves the same way.`]);
+  else if (p.off) L.push(["info", `Partner search (another star moving the same way) needs the Gaia catalogue switched on.`]);
 
   if (C.reports_here && C.reports_here.length)
     L.push(["info", `Already reported on this computer by ${C.reports_here.map((r) => `${esc(r.by)} (${r.when})`).join(", ")}.`]);
@@ -372,13 +380,14 @@ renderChecks = function (C) {
   if ((C.gaia || {}).found) knownIn.push("Gaia");
   for (const c of C.catalogs || []) if (c.found) knownIn.push(c.name);
   if (((C.simbad || {}).objects || []).length) knownIn.push("SIMBAD");
-  if (((C.asteroids || {}).hits || []).length) knownIn.push("the list of known asteroids");
-  const checked = [...(C.checked || []).filter((n) => n !== "SIMBAD"), "SIMBAD names", "known asteroids"].join(", ");
-  const noStarCat = !(C.checked || []).some((n) => n !== "SIMBAD");
+  // an asteroid that once passed over this spot does not make the object under the click a known one:
+  // it is reported in its own line below, not in the verdict
+  const checked = [...(C.checked || []).map((n) => (n === "SIMBAD" ? "SIMBAD names" : n)), "known asteroids"].join(", ");
+  const noStarCat = !(C.checked || []).length;
   const verdict = !knownIn.length && noStarCat
     ? `<div class="verdict known" style="color:#cfe6ff;border-color:rgba(108,196,255,0.5);background:rgba(108,196,255,0.07)">` +
-      `No star catalogue is switched on, so the tool cannot tell whether this object is already known. ` +
-      `Switch on Gaia (and others) under "Catalogues of known objects" before reporting it.</div>`
+      `No catalogue is switched on, so the tool has not checked whether this object is already known. ` +
+      `Switch on Gaia (and others) under "Catalogues of known objects" to find out, and do that before reporting it.</div>`
     : !knownIn.length
     ? `<div class="verdict new">★ Unexplained by what was checked (${esc(checked)}). That does not prove it is new: switch on more catalogues to check further. It is worth a report.</div>`
     : `<div class="verdict known">✔ Already known: listed in ${esc(knownIn.join(", ").replace(/, ([^,]*)$/, " and $1"))}. Knowing that is useful too: nothing lost by having looked.</div>`;

@@ -44,14 +44,31 @@ def load_position(ra: float, dec: float, field_deg: float) -> dict:
 
 
 _loading: dict = {}
+_results: dict = {}
 
 
-def _load(ra, dec, field_deg, key):
-    res = json.loads(flipbook.saved_path(ra, dec, field_deg).read_text())
-    cut_deg = round(max(0.1, field_deg * 1.5), 3)
-    cdir = flipbook.place_dir(ra, dec) / f"cutouts_{cut_deg}"
-    # The shared copy of the project (GitHub) carries the stacked pictures but not the
-    # ~45 MB of single photos per target. Fetch any that are missing (about 2 minutes).
+def saved_result(ra: float, dec: float, field_deg: float) -> dict:
+    """The saved stacked result of a patch, read straight from its file (kept in memory for the
+    last few patches). Unlike load_position this does not need the single photos, so anything
+    that works on the stacked pictures (the mover search, the computer's picks) answers at once,
+    also on a fresh copy of the project where the single photos are not downloaded yet."""
+    ra, dec = round(ra, 4), round(dec, 4)
+    path = flipbook.saved_path(ra, dec, field_deg)
+    stamp = path.stat().st_mtime
+    key = str(path)
+    with _lock:
+        hit = _results.get(key)
+        if hit and hit[0] == stamp:
+            return hit[1]
+    res = json.loads(path.read_text())
+    with _lock:
+        _results[key] = (stamp, res)
+        while len(_results) > 4:
+            _results.pop(next(iter(_results)))
+    return res
+
+
+def _read_cutouts(ra, dec, cdir, cut_deg):
     listing = flipbook.place_dir(ra, dec) / "images.json"
     if listing.exists():
         from . import archive
@@ -60,12 +77,29 @@ def _load(ra, dec, field_deg, key):
         if have < 0.97 * len(images):   # many missing: try again (already-saved photos are skipped)
             print(f"  downloading the single photos for RA {ra} Dec {dec} (needed for spectra and lenses)...")
             archive.fetch_all(images, ra, dec, cut_deg, cdir)
-    cuts = []
-    for p in sorted(cdir.glob("*.fits")):
+    def _one(p):
         try:
-            cuts.append(frames.load_cutout(p, ra, dec))
+            return frames.load_cutout(p, ra, dec)
         except Exception:
-            pass
+            return None
+
+    cuts = [c for c in map(_one, sorted(cdir.glob("*.fits"))) if c is not None]
+    return cuts
+
+
+def _load(ra, dec, field_deg, key):
+    res = json.loads(flipbook.saved_path(ra, dec, field_deg).read_text())
+    cut_deg = round(max(0.1, field_deg * 1.5), 3)
+    cdir = flipbook.place_dir(ra, dec) / f"cutouts_{cut_deg}"
+    # The shared copy of the project (GitHub) carries the stacked pictures but not the
+    # ~45 MB of single photos per target. Fetch any that are missing (about 2 minutes).
+    fresh = flipbook.JUST_BUILT
+    if fresh and fresh["key"] == (ra, dec, field_deg):
+        # this patch was built a moment ago: its photos are already read, use them as they are
+        flipbook.JUST_BUILT = None
+        cuts = list(fresh["cuts"])
+    else:
+        cuts = _read_cutouts(ra, dec, cdir, cut_deg)
     # use the SAME pass numbers as the saved pictures (not a fresh guess), so spectra,
     # flags and lenses always talk about the same sky passes as the flip-book
     saved = {(e.get("obs_id"), e["band"]): e["pass_index"] for e in res.get("exposures", [])}
@@ -416,8 +450,8 @@ def movers(ra0: float, dec0: float, field_deg: float, cats="gaia") -> dict:
     from . import movers as mv
     keys = catalogs.parse_keys(cats)
 
-    pos = load_position(ra0, dec0, field_deg)
-    res = pos["result"]
+    res = saved_result(ra0, dec0, field_deg)
+    pos = dict(ra=round(ra0, 4), dec=round(dec0, 4))
     grid, shape = frames.target_grid(pos["ra"], pos["dec"], field_deg)
     mjds = [p["mjd"] for p in res["passes"]]
     found = []
@@ -563,8 +597,8 @@ def picks(ra0: float, dec0: float, field_deg: float, cats="gaia") -> dict:
     import base64
     from . import movers as mv
 
-    pos = load_position(ra0, dec0, field_deg)
-    res = pos["result"]
+    res = saved_result(ra0, dec0, field_deg)
+    pos = dict(ra=round(ra0, 4), dec=round(dec0, 4))
     grid, shape = frames.target_grid(pos["ra"], pos["dec"], field_deg)
     n = shape[0]
     pix = res["pix_arcsec"]
@@ -594,10 +628,13 @@ def picks(ra0: float, dec0: float, field_deg: float, cats="gaia") -> dict:
         out.append(dict(kind="mover", east=x["track"][0][0], north=x["track"][0][1], track=x["track"],
                         rate=x["rate"], rate_east=x["rate_east"], rate_north=x["rate_north"], status=x["status"],
                         known_in=x.get("known_in", []), matches=x.get("matches", []),
-                        title=("Unexplained mover" if cand else "Known mover" if x["status"].startswith("known") else "Doubtful mover"),
+                        title=("Unexplained mover" if cand else "Known mover" if x["status"].startswith("known")
+                               else "Moving object" if x["status"].startswith("unchecked") else "Doubtful mover"),
                         why=f"Moved steadily between passes, about {x['rate']:.1f}″ per year. " +
                             (f"Unexplained by the catalogues checked ({checked_txt})." if cand
                              else f"Known in {known_txt}: {x['status'].split(': ', 1)[-1]}." if x["status"].startswith("known")
+                             else "Not compared with any catalogue yet: switch one on to see whether it is already known."
+                             if x["status"].startswith("unchecked")
                              else x["status"].split(": ", 1)[-1] + "."),
                         score=100 + x["sigma"]))
     mover_spots = [t for x in m["movers"] for t in x["track"]]
@@ -693,38 +730,31 @@ def known_objects(ra0: float, dec0: float, field_deg: float, cats="gaia") -> dic
     half = field_deg * 1800
     out = dict(fast_stars=[], named=[], asteroids=[], notes=[])
     try:
+        from . import catalogs as _cat
+        if "gaia" not in _cat.parse_keys(cats):
+            raise LookupError("Gaia is switched off")
         g = gaia(ra0, dec0, field_deg)
         for s_ in g["stars"]:
             if s_["pm"] >= 100:
                 t = s_["track"][len(s_["track"]) // 2]
                 out["fast_stars"].append(dict(g=s_["g"], pm=round(s_["pm"] / 1000, 2), east=t[0], north=t[1]))
         out["n_gaia"] = g["n"]
+    except LookupError:
+        pass
     except Exception as e:
         out["notes"].append(f"Gaia could not be reached ({e}).")
     try:
-        q = ("SELECT TOP 40 main_id, otype, sp_type, ra, dec FROM basic WHERE "
-             f"CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS',{ra0},{dec0},{field_deg * 0.72}))=1 AND otype <> 'Pl'")
-        rows = None
-        for url in objcheck.SIMBAD_TAPS:
-            try:
-                rows = objcheck._tap_csv(url, q, extra={"request": "doQuery", "lang": "adql", "format": "csv", "query": q})
-                break
-            except Exception:
-                continue
-        if rows is None:
-            out["notes"].append("The SIMBAD name database could not be reached.")
-        for r in rows or []:
-            e = ((float(r["ra"]) - ra0 + 180) % 360 - 180) * 3600 * cosd; n = (float(r["dec"]) - dec0) * 3600
-            if max(abs(e), abs(n)) > half:
-                continue
-            code = r["otype"].strip('"')
-            out["named"].append(dict(name=r["main_id"].strip('"'), type=objcheck.OTYPES.get(code, code),
-                                     plain=code in ("*", "IR", "NIR"), east=round(e), north=round(n),
-                                     d=float(np.hypot(e, n))))
-        # the interesting kinds first, then nearest the centre
-        out["named"].sort(key=lambda o: (o["plain"], o["d"]))
-        out["n_named"] = len(out["named"])
-        out["named"] = out["named"][:8]
+        from . import catalogs as _cat2
+        if "simbad" in _cat2.parse_keys(cats):
+            # the SIMBAD list saved for this patch (downloaded once, when SIMBAD was first switched on)
+            v = _cat2.for_view(ra0, dec0, field_deg, "simbad")
+            for o in v["sources"]:
+                out["named"].append(dict(name=o["name"], type=o["type"], plain=o["plain"], east=round(o["east"]),
+                                         north=round(o["north"]), d=float(np.hypot(o["east"], o["north"]))))
+            # the interesting kinds first, then nearest the centre
+            out["named"].sort(key=lambda o: (o["plain"], o["d"]))
+            out["n_named"] = len(out["named"])
+            out["named"] = out["named"][:8]
     except Exception as e:
         out["notes"].append(f"SIMBAD lookup failed ({e}).")
     # the other switched-on catalogues: how many sources, and which ones they say are moving

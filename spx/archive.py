@@ -24,6 +24,10 @@ COLLECTIONS = ["spherex_dr1", "spherex_qr3"]
 _session = requests.Session()
 
 
+class ArchiveBusy(RuntimeError):
+    """NASA's archive did not answer (as opposed to answering "nothing here")."""
+
+
 def _get(url, params=None, tries=5, timeout=120):
     """GET with retries (the archive drops a connection now and then)."""
     last = None
@@ -68,6 +72,11 @@ def find_images(ra: float, dec: float, cache_dir: Path) -> list[dict]:
             best[key] = dict(obs_id=key[0], detector=det, mjd=float(row["t_min"]),
                              collection=coll, url=row["access_url"], rank=rank)
     out = sorted(best.values(), key=lambda d: (d["mjd"], d["detector"]))
+    if not out and not complete:
+        # the search itself failed: that is not the same as "no photos of this spot"
+        raise ArchiveBusy("NASA's archive is not answering its image search right now (it reports being busy). "
+                          "Nothing is wrong on your side: please try again in a minute or two. "
+                          "Patches you opened before, and the showcase targets, still work.")
     if complete:
         cache.write_text(json.dumps(out))
     return out
