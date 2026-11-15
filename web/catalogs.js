@@ -23,11 +23,7 @@ const CAT_FAINTEST = { panstarrs: 20, catwise: 16.8, skymapper: 19 };    // fain
 
 // All catalogues start switched off: the person looks first, and chooses what to compare with.
 // (The choice is remembered on this computer from then on.)
-S.cats = new Set();
-try {
-  const saved = JSON.parse(localStorage.getItem("cats.v2") || "null");
-  if (Array.isArray(saved)) S.cats = new Set(saved.filter((k) => CAT[k]));
-} catch (e) { /* no saved choice */ }
+S.cats = new Set();          // nothing is remembered between visits: every visit starts with all catalogues off
 S.catData = {}; S.catState = {};
 
 const cat0_posQuery = posQuery;
@@ -88,7 +84,6 @@ function rescanWithCats() {
 async function toggleCat(key) {
   if (S.cats.has(key)) S.cats.delete(key);
   else { S.cats.add(key); if (!S.tableOnly) S.showGaia = true; }
-  try { localStorage.setItem("cats.v2", JSON.stringify([...S.cats])); } catch (e) { /* private window */ }
   delete S.catState[key];
   renderCatChips();
   if (S.cats.has(key)) {

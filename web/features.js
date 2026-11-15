@@ -1,6 +1,6 @@
 // Every optional feature starts switched off: a patch opens as the plain flip-book with its
-// play controls, and the person switches on what they want. Their choices are remembered on
-// this computer, and a shared link that names a feature (?scan=1&ast=1&other=1&cross=1, as
+// play controls, and the person switches on what they want. Choices last for the visit only
+// (nothing is remembered), and a shared link that names a feature (?scan=1&ast=1&other=1&cross=1, as
 // well as cats=..., gaia=1) switches it on.
 //   scan  = the computer's notice and picks panel      ("💡 Computer's picks")
 //   ast   = known asteroids: marks, panel and the check itself ("☄ Asteroids")
@@ -11,7 +11,7 @@
 "use strict";
 
 const FEAT_KEY = "features.v1";
-const F_SAVED = (() => { try { return JSON.parse(localStorage.getItem(FEAT_KEY) || "{}") || {}; } catch (e) { return {}; } })();
+const F_SAVED = {};      // nothing is remembered between visits: every visit starts with everything off
 const F_LINK = new URLSearchParams(location.search);
 const featWant = (k) => (F_LINK.has(k) ? F_LINK.get(k) === "1" : !!F_SAVED[k]);
 
@@ -20,7 +20,7 @@ S.showAst = featWant("ast");
 S.otherPref = featWant("other");
 S.cross = featWant("cross");
 function saveFeat() {
-  try { localStorage.setItem(FEAT_KEY, JSON.stringify({ scan: S.scanOn, ast: S.showAst, other: S.otherPref, cross: S.cross })); } catch (e) { /* private window */ }
+  /* choices last for this visit only (and travel in share links) */
 }
 $("astBtn").classList.toggle("on", S.showAst);
 $("cross").classList.toggle("on", S.cross);

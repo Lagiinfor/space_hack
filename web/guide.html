@@ -183,7 +183,7 @@
     <b>Catalogues of known objects</b> you choose which ones to use, as many as you like. Each has its own colour.
     A catalogue is downloaded for a patch the first time you switch it on there, and kept on the computer after that. <b>All catalogues start
     switched off</b>: you look first, then choose what to compare with. While none is on, the tool says "moving object"
-    without calling it known or unexplained. Your choice is remembered on this computer.</p>
+    without calling it known or unexplained. Nothing is remembered: every visit starts with all catalogues off.</p>
   <table>
     <tr><td><span style="color:#4fd765">●</span> <b>Gaia DR3</b></td><td>ESA's star catalogue: very precise positions and motions in visible light. Whole sky. Misses very cold or very red objects.</td></tr>
     <tr><td><span style="color:#ff9f43">●</span> <b>CatWISE2020</b></td><td>NASA's WISE and NEOWISE, 2010 to 2018: infrared sources with motions. Whole sky. The best catalogue for cold brown dwarfs that Gaia cannot see.</td></tr>
@@ -465,7 +465,7 @@
   <h2 id="more">More tools</h2>
   <p><b>Everything optional starts switched off.</b> A patch opens as the plain flip-book with its play controls. Under
     "On the picture" you switch on what you want: 💡 Computer's picks (the notice and the list), Older photos, ☄ Asteroids,
-    Catalogue marks, the centre mark; below that the catalogues. Your choices are remembered on this computer, and a
+    Catalogue marks, the centre mark; below that the catalogues. Nothing is remembered between visits: every visit starts with everything off. A
     shared link switches on the features it names.</p>
   <ul>
     <li><b>Exact wavelengths:</b> under "Infrared colour", type a wavelength range in microns, for example <code>3.2-3.5</code>, or several separated by commas (<code>3.2-3.5, 4.4-5.0</code>), and press Show. The flip-book is then built only from photos taken at those wavelengths, with the same mix in every sky pass; several ranges are averaged, and a pass with no photo in one of them is left out. A narrow range has few photos, so the picture is noisier; the line under the box says how many photos each pass has.</li>
@@ -474,7 +474,7 @@
     <li><b>Your own false colours:</b> in Chemistry filters, type three wavelength ranges for red, green and blue.</li>
     <li><b>Spectrum extras:</b> under the graph you can download every measurement as CSV (with uncertainty, date, signal divided by noise and NASA's flags). Hovering a point on the graph shows the same details for that one photo.</li>
     <li><b>Catalogue entries:</b> for a clicked object, a table with each catalogue's identifier, coordinates, position date, brightness, motion and parallax.</li>
-    <li><b>Catalogue summary table:</b> under the catalogue switches: how many objects each switched-on catalogue holds in the patch, how many are clearly moving, and (with SIMBAD on) how many of each kind. A total row counts each object once. "Switch all on" opens every catalogue; "Table only" keeps the table without marks on the picture.</li>
+    <li><b>Catalogue summary table:</b> under the catalogue switches: how many objects each switched-on catalogue holds in the patch, how many are clearly moving, and (with SIMBAD on) how many of each kind. A total row counts each object once. "On" switches every catalogue on, "Off" switches them all off, and "Table only" keeps the table without marks on the picture.</li>
     <li><b>Original files:</b> in "Every photo in the frame on screen", each observation links to its original file in NASA's archive.</li>
     <li><b>Export data:</b> under "More controls", below "Copy share link". Choose what to export; the first format offered is the natural one and you can pick the other. The picture on screen (photo, difference or stack) is saved as <b>FITS</b> with the sky coordinates in its header, or as PNG. The spectrum of the clicked object, the catalogue objects, the computer's candidates and the list of photos are saved as <b>CSV</b>, or as JSON.</li>
     <li><b>Share links</b> keep the position, field (<code>fov</code> or <code>field</code>, in degrees), band, view, pass on screen, selected object and catalogues. A link with an impossible position explains what is wrong.</li>

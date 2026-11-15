@@ -336,15 +336,15 @@ function renderCatTable() {
     $("catinfo").insertAdjacentElement("afterend", box);
     const bar = document.createElement("div");
     bar.className = "row wrap"; bar.style.margin = "6px 0";
-    bar.innerHTML = `<button class="small-btn" id="catall">Switch all on</button><button class="small-btn" id="catnone">All off</button>` +
-      `<button class="small-btn" id="cattab" title="Keep the summary table but draw no catalogue marks on the picture">📋 Table only</button>`;
+    bar.innerHTML = `<button class="small-btn" id="catall" title="Switch every catalogue on">On</button><button class="small-btn" id="catnone" title="Switch every catalogue off">Off</button>` +
+      `<button class="small-btn" id="cattab" title="Keep the summary table but draw no catalogue marks on the picture">Table only</button>`;
     $("catchips").insertAdjacentElement("afterend", bar);
     $("catall").onclick = async () => { for (const c of CAT_LIST) if (!S.cats.has(c.key)) await toggleCat(c.key); };
-    $("catnone").onclick = async () => { for (const c of CAT_LIST) if (S.cats.has(c.key)) await toggleCat(c.key); };
+    $("catnone").onclick = async () => { for (const c of CAT_LIST) if (S.cats.has(c.key)) await toggleCat(c.key); S.showGaia = false; S.tableOnly = false; refresh(); renderCatTable(); };
     $("cattab").onclick = () => { S.tableOnly = !S.tableOnly; S.showGaia = !S.tableOnly && S.cats.size > 0; refresh(); renderCatTable(); };
   }
   $("cattab").classList.toggle("on", S.tableOnly);
-  $("cattab").textContent = S.tableOnly ? "📋 Table only: on (no marks)" : "📋 Table only";
+  $("cattab").textContent = "Table only";
   if (!S.R || S.R.preview || !S.cats.size || S.practice) { box.innerHTML = ""; return; }
   if (S.cats.has("gaia") && !S.gaia && !S.gaiaAsked) { S.gaiaAsked = posKey(); loadGaia().then(() => renderCatTable()); }
   const per = catObjects();
