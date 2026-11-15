@@ -78,7 +78,7 @@ function renderComboUI() {
     box.insertAdjacentElement("afterend", n);
   }
   chip.style.display = S.R.follow ? "none" : "";
-  if (S.band > 6) S.comboMode = true;
+  if (S.band > 6 && S.band !== 99) S.comboMode = true;
   chip.textContent = S.comboMode ? "✓ Combining colours" : "➕ Combine colours";
   chip.classList.toggle("on", S.comboMode);
   const sel = comboSelection();
@@ -130,4 +130,67 @@ blinkFrames = function () {
   const all = framesForBand(), ok = all.filter((f) => !f.thin && !f.limited);
   const fs = ok.length >= 2 ? ok : all;
   return S.blinkset === "ends" && fs.length > 2 ? [fs[0], fs[fs.length - 1]] : fs;
+};
+
+// ---------------------------------------------------------------- exact wavelengths
+// Type one wavelength range, or several, in microns (3.2-3.5 or 3.2-3.5, 4.4-5.0). The server stacks
+// only the photos taken at those wavelengths, pass by pass with the same mix, and the flip-book
+// shows them as band number 99. Needs the single photos, so the first use on a patch can take a while.
+S.wlWin = "";
+(function wireWavelengths() {
+  const box = document.createElement("div");
+  box.id = "wlbox"; box.className = "row wrap small-note"; box.style.marginTop = "8px";
+  box.innerHTML = `<span>Exact wavelengths (µm):</span> <input id="wlin" type="text" placeholder="3.2-3.5  or  3.2-3.5, 4.4-5.0" style="flex:1 1 170px;min-width:0" ` +
+    `title="One range, or several separated by commas, between 0.75 and 5.0 microns. Several ranges are averaged."> ` +
+    `<button class="small-btn" id="wlgo">Show</button> <span class="muted" id="wlmsg" style="flex-basis:100%"></span>`;
+  $("bands").insertAdjacentElement("afterend", box);
+  $("wlgo").onclick = () => showWavelengths($("wlin").value);
+  $("wlin").addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") showWavelengths($("wlin").value); });
+})();
+
+async function showWavelengths(text) {
+  if (!S.R || S.R.preview || S.R.follow) return;
+  const parts = text.replace(/[–—]/g, "-").split(",").map((p) => p.trim()).filter(Boolean)
+    .map((p) => p.split("-").map((x) => parseFloat(x)));
+  if (!parts.length || parts.length > 4 || parts.some((w) => w.length !== 2 || !(w[0] >= 0.75 && w[1] <= 5.0 && w[0] < w[1]))) {
+    $("wlmsg").textContent = "Type a range like 3.2-3.5 (smaller number first, between 0.75 and 5.0), or up to four ranges separated by commas.";
+    return;
+  }
+  const win = parts.map((w) => `${w[0]}-${w[1]}`).join(",");
+  const key = posKey();
+  $("wlmsg").textContent = "Stacking only the photos taken at these wavelengths (the first time on a patch this can take a while)...";
+  try {
+    const W = await api(`/api/window?${key}&win=${win}`);
+    if (!S.R || posKey() !== key) return;
+    if (!W.frames.length) { $("wlmsg").textContent = `No sky pass has photos in ${parts.length > 1 ? "all of these ranges" : "this range"} here (photos found: ${W.counts.join(", ")}). Try a wider range.`; return; }
+    S.R.frames = S.R.frames.filter((f) => f.band !== 99);
+    for (const f of W.frames) {
+      f.arr = unpack(f.pixels); f.band = 99; f.custom = true; f.thin = f.n_min < 3;
+      f.ranges = parts.map((w) => `${w[0]}–${w[1]}`);
+      S.R.frames.push(f);
+    }
+    S.band = 99; S.wlWin = win; S.comboMode = false; S.flags = null; S.frameIdx = 0;
+    refresh();
+    const thin = W.frames.filter((f) => f.thin || f.limited).length;
+    $("wlmsg").textContent = `Showing ${parts.map((w) => `${w[0]}–${w[1]} µm`).join(" + ")}: ${W.frames.length} sky pass${W.frames.length > 1 ? "es" : ""}, ` +
+      `${W.frames.map((f) => f.n).join(" / ")} photos.` + (thin ? " Some passes have very few photos at these wavelengths, so the picture is noisy." : "") +
+      " Click any colour above to go back.";
+  } catch (e) { $("wlmsg").textContent = "Could not build this: " + e.message; }
+}
+
+const band1_updateURL = updateURL;
+updateURL = function () {
+  band1_updateURL();
+  if (!S.R) return;
+  const p = new URLSearchParams(location.search);
+  if (S.band === 99 && S.wlWin) p.set("wl", S.wlWin); else p.delete("wl");
+  history.replaceState(null, "", "?" + p.toString());
+};
+const BAND_LINK_WL = new URLSearchParams(location.search).get("wl");
+let bandLinkDone = false;
+const band1_afterFinal = afterFinal;
+afterFinal = function () {
+  band1_afterFinal();
+  if (!bandLinkDone && BAND_LINK_WL && S.R && !S.R.follow) { bandLinkDone = true; $("wlin").value = BAND_LINK_WL; setTimeout(() => showWavelengths(BAND_LINK_WL), 500); }
+  else if (S.band !== 99 && $("wlmsg")) $("wlmsg").textContent = "";
 };

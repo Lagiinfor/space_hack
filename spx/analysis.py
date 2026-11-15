@@ -371,6 +371,49 @@ def lens(ra0: float, dec0: float, field_deg: float, key: str, pass_index: int | 
                 channels=[flipbook._pack(c) for c in chans])
 
 
+def window_frames(ra0: float, dec0: float, field_deg: float, windows) -> dict:
+    """Flip-book frames built only from the photos whose wavelength (at the patch centre) falls
+    in the wavelength ranges the person typed, for example 3.2-3.5 um, or 3.2-3.5 and 4.4-5.0.
+
+    Same fairness rule as the detector bands: within each range, every pass is stacked from the
+    same wavelength slices (frames.stack_like_for_like); with several ranges, a pass's frame is
+    the plain average of the ranges, and a pass that lacks one of them is left out."""
+    from astropy.stats import sigma_clipped_stats
+    pos = load_position(ra0, dec0, field_deg)
+    res = pos["result"]
+    grid, shape = frames.target_grid(pos["ra"], pos["dec"], field_deg)
+    per = []
+    for lo, hi in windows:
+        by_pass = {}
+        for c, p_ in zip(pos["cuts"], pos["passes"]):
+            if lo <= c.wavelength < hi:
+                by_pass.setdefault(int(p_), []).append(c)
+        per.append(frames.stack_like_for_like(by_pass, grid, shape, n_sub=3, min_exposures=3) if by_pass else {})
+    out, counts = [], []
+    for k in sorted(set().union(*[set(r) for r in per]) if per else []):
+        if not all(k in r for r in per):
+            continue                      # this pass has no photo in one of the ranges
+        parts = [r[k] for r in per]
+        with np.errstate(all="ignore"):
+            img = np.mean([p_["img"] for p_ in parts], axis=0)      # NaN where any range lacks data
+        img, filled = frames.fill_saturated_cores(img)
+        out.append(dict(pass_index=k, n=int(sum(p_["n"] for p_ in parts)), n_min=int(min(p_["n"] for p_ in parts)),
+                        limited=bool(any(p_["limited"] for p_ in parts)),
+                        wl_min=float(min(p_["wl_min"] for p_ in parts)), wl_max=float(max(p_["wl_max"] for p_ in parts)),
+                        data=img))
+    for lo, hi in windows:
+        counts.append(sum(1 for c in pos["cuts"] if lo <= c.wavelength < hi))
+    if out:
+        vals = np.concatenate([f["data"][np.isfinite(f["data"])] for f in out])
+        _, _, sd = sigma_clipped_stats(vals, sigma=3) if vals.size else (0, 0, 1e-6)
+    for f in out:
+        d = f.pop("data")
+        f["noise"] = float(max(sd, 1e-6))
+        f["peak"] = float(np.nanmax(d)) if np.isfinite(d).any() else 1.0
+        f["pixels"] = flipbook._pack(d)
+    return dict(frames=out, windows=[list(w) for w in windows], counts=counts, n_passes=len(res["passes"]))
+
+
 def lens_list():
     return [dict(key=k, name=v["name"], explain=v["explain"], windows=v["windows"]) for k, v in LENSES.items()]
 

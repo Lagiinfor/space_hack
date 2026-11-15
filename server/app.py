@@ -179,6 +179,18 @@ def lens(ra0: float, dec0: float, field: float, key: str, pass_index: int | None
     return analysis.lens(ra0, dec0, field, key, pass_index)
 
 
+@app.get("/api/window")
+def window(ra0: float, dec0: float, field: float, win: str):
+    """Flip-book frames from the person's own wavelength ranges: win = "lo-hi" or "lo-hi,lo-hi" (microns)."""
+    _ready(ra0, dec0, field)
+    try:
+        windows = [tuple(float(x) for x in part.split("-")) for part in win.split(",") if part.strip()]
+        assert 1 <= len(windows) <= 4 and all(len(w) == 2 and 0.7 <= w[0] < w[1] <= 5.1 for w in windows)
+    except Exception:
+        raise HTTPException(400, "Type wavelength ranges in microns between 0.75 and 5.0, like 3.2-3.5 or 3.2-3.5, 4.4-5.0.")
+    return analysis.window_frames(ra0, dec0, field, windows)
+
+
 @app.get("/api/images")
 def images(ra0: float, dec0: float, field: float):
     """Where each photo of this patch lives in NASA's archive (the original full file)."""

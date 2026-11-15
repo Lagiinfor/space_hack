@@ -519,6 +519,7 @@ function draw() {
     const viewTxt = { normal: "", diff: " (difference)", first: ` (minus ${S.R.passes[fs[0].pass_index].label})`, stack: "" }[S.view];
     label = S.view === "stack" ? "All passes added" : p.label + viewTxt;
     const bandName = S.band === 0 ? `${f.n_detectors ?? 6} of 6 detectors averaged`
+      : f.custom ? `only ${f.ranges.join(" + ")} µm (your choice), same mix in every pass`
       : f.combo ? `${f.combo.length} colours averaged (${f.ranges.join(" + ")} µm), same mix in every pass`
       : (f.wl_min ? `${f.wl_min.toFixed(2)}–${f.wl_max.toFixed(2)} µm, same wavelength mix in every pass` : "");
     const nimg = S.view === "stack" ? fs.reduce((s, g) => s + g.n, 0) : f.n;
